@@ -319,7 +319,7 @@ function App() {
   const [viewDate, setViewDate] = useState(new Date());
   const [weekAnchor, setWeekAnchor] = useState(new Date());
 
-  // 💡 학교별 격리 및 전체 빈 화면 스플래시 제어
+  // 💡 [요청사항 반영] 최초 진입 시 학교 선택 상태 처리 (선택 전에는 메인 화면 진입 불가)
   const savedSchool = localStorage.getItem("sp_school");
   const [currentOffice, setCurrentOffice] = useState(() => localStorage.getItem("sp_office") || "서부교육지원청");
   const [currentSchool, setCurrentSchool] = useState(() => savedSchool || "");
@@ -391,7 +391,7 @@ function App() {
   const currentClassKey = `${selectedGrade}_${selectedClass || '전체'}`;
   const currentClassPassword = selectedClass ? (classPasswords[`${selectedGrade}_${selectedClass}`] || "1234") : "1234";
 
-  // 학년 변경 시 학급 선택 초기화 (학년 공통 뷰 상태)
+  // 💡 [요청사항 반영] 학년 클릭 시 selectedClass를 null로 만들어 학년 공통 뷰(초기화 상태)로 진입
   const handleGradeClick = (g) => {
     setSelectedGrade(g);
     setSelectedClass(null);
@@ -577,6 +577,14 @@ function App() {
     const timer = setInterval(fetchAllData, 5000);
     return () => clearInterval(timer);
   }, [supabase, fetchAllData]);
+
+  // 💡 [요청사항 반영] 학교 변경 버튼 클릭 시 기존 학교 정보 삭제 후 선택 화면으로 전환
+  const handleChangeSchool = () => {
+    localStorage.removeItem("sp_school");
+    localStorage.removeItem("sp_office");
+    setCurrentSchool("");
+    setSchoolModalOpen(true);
+  };
 
   const handleApplySchoolChange = (newOffice, newSch) => {
     setCurrentOffice(newOffice);
@@ -804,7 +812,7 @@ function App() {
       ...emptyForm,
       targetGrade: selectedGrade,
       category: autoCategory,
-      schedules: [defaultScheduleRow(baseDate)],
+      schedules: [defaultScheduleRowForForm(baseDate)],
       repeatEndDate: defaultEnd,
       repeatCycles: initialCycles
     });
@@ -839,7 +847,7 @@ function App() {
   const addScheduleRow = () => {
     const lastRow = form.schedules[form.schedules.length - 1];
     const newDate = lastRow ? lastRow.date : ymd(today);
-    setForm(prev => ({ ...prev, schedules: [...prev.schedules, defaultScheduleRow(newDate)] }));
+    setForm(prev => ({ ...prev, schedules: [...prev.schedules, defaultScheduleRowForForm(newDate)] }));
   };
 
   const removeScheduleRow = (index) => {
@@ -1012,7 +1020,7 @@ function App() {
           </div>
         )}
 
-        {/* 💡 [요청사항 반영] 상단 고정 학교 변경 바 (오른쪽 상단 학교 변경 버튼) */}
+        {/* 💡 [요청사항 반영] 상단 고정 학교 바 및 [학교 변경] 버튼 */}
         <div className="mb-3 flex items-center justify-between rounded-xl bg-violet-900 px-4 py-2.5 text-white shadow-md">
           <div className="flex items-center gap-2 text-xs font-bold truncate">
             <SchoolIcon size={16} className="text-violet-300 shrink-0" />
@@ -1020,7 +1028,7 @@ function App() {
             <span className="text-sm font-black text-white truncate">{currentSchool || "학교 미선택"}</span>
           </div>
           <button
-            onClick={() => { setTempOffice(currentOffice); setTempSchool(currentSchool || "인천경연초등학교"); setSchoolSearchQuery(""); setSchoolModalOpen(true); }}
+            onClick={handleChangeSchool}
             className="shrink-0 rounded-lg bg-violet-700 hover:bg-violet-600 px-3.5 py-1 text-xs font-bold text-white transition shadow-2xs cursor-pointer"
           >
             학교 변경
@@ -1226,7 +1234,7 @@ function App() {
           })}
         </div>
 
-        {/* 💡 [요청사항 반영] 최초 진입 및 [학교 변경] 시 전체를 덮는 학교 선택 화면 (스플래시/모달) */}
+        {/* 💡 [요청사항 반영] 최초 진입 및 [학교 변경] 시 전체를 덮는 학교 선택 화면 (스플래시) */}
         {schoolModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4 backdrop-blur-md overflow-y-auto">
             <div className="w-full max-w-lg rounded-3xl bg-white p-6 sm:p-8 shadow-2xl ring-1 ring-black/5 relative my-8">
@@ -1471,7 +1479,7 @@ function App() {
                         value={newSpecialistInput}
                         onChange={(e) => setNewSpecialistInput(e.target.value)}
                         placeholder="예) 영어전담"
-                        className="flex-1 rounded-lg border bg-slate-50 px-2.5 py-1 text-xs font-slate-700 outline-none"
+                        className="flex-1 rounded-lg border bg-slate-50 px-2.5 py-1 text-xs text-slate-700 outline-none"
                       />
                       <button
                         type="button"
