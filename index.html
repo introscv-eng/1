@@ -23,7 +23,7 @@ body { font-family: 'Inter', sans-serif; }
 
 <script type="text/babel">
 const SUPABASE_URL = "https://tygsgurwjpojzzrtyhrq.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6InFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzIyMzI2OH0.VR63l1j_PMhetS3pY3RsIT6G3sFFZZlZNjEg39dtn6s";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzIyMzI2OH0.VR63l1j_PMhetS3pY3RsIT6G3sFFZZlZNjEg39dtn6s";
 
 const { useState, useMemo, useEffect, useCallback } = React;
 
@@ -508,7 +508,6 @@ function App() {
   const gradeNoticeKey = getPeriodKey("grade");
   const classNoticeKey = getPeriodKey("class");
 
-  // 💡 [필수 반영] 공지사항 변수 선언 추가로 백야 현상 방지
   const activeGradeNotice = notices[gradeNoticeKey] || "";
   const activeClassNotice = notices[classNoticeKey] || "";
 
@@ -583,7 +582,6 @@ function App() {
     return () => clearInterval(timer);
   }, [supabase, fetchAllData]);
 
-  // 💡 [필수 반영] 누락되었던 관리자 설정 및 CSV 업로드 관련 함수 12개 전부 포함
   const handleUpdateTodayPosition = async (newPos) => {
     setTodayPosition(newPos);
     localStorage.setItem("sp_today_pos", newPos);
