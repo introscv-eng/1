@@ -8,6 +8,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
 <style>
 body { font-family: 'Inter', sans-serif; }
@@ -21,8 +22,8 @@ body { font-family: 'Inter', sans-serif; }
 <div id="root"></div>
 
 <script type="text/babel">
-const SUPABASE_URL = "https://tygsgurwjpojjzzrtyhrq.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6InFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzIyMzI2OH0.VR63l1j_PMhetS3pY3RsIT6G3sFFZZlZNjEg39dtn6s";
+const SUPABASE_URL = "https://tygsgurwjpojzzrtyhrq.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzIyMzI2OH0.VR63l1j_PMhetS3pY3RsIT6G3sFFZZlZNjEg39dtn6s";
 
 const { useState, useMemo, useEffect, useCallback, useRef } = React;
 
@@ -362,30 +363,18 @@ function App() {
     setIsNoticeEditing(true);
   };
 
-  // 학교용처럼 완벽하게 검증된 원초적 fetch 방식 통신 헬퍼
-  const sbFetch = async (table, method = 'GET', body = null, query = '') => {
-    try {
-      const url = `${SUPABASE_URL}/rest/v1/${table}${query}`;
-      const headers = {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-      };
-      const options = { method, headers };
-      if (body) options.body = JSON.stringify(body);
-      const res = await fetch(url, options);
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || res.statusText);
+  // 공식 Supabase JS 라이브러리 연동
+  const supabase = useMemo(() => {
+    if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+      try { 
+        return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); 
+      } catch (err) { 
+        console.error("Client Init Error:", err);
+        return null; 
       }
-      if (method === 'DELETE' || res.status === 204) return [];
-      return await res.json();
-    } catch (e) {
-      console.error("Supabase API Error:", e);
-      throw e;
     }
-  };
+    return null;
+  }, []);
 
   const handleSaveNotice = async () => {
     const trimmed = noticeInput.trim();
@@ -398,9 +387,9 @@ function App() {
     setNotices(updated);
     setIsNoticeEditing(false);
     localStorage.setItem("sp_notices", JSON.stringify(updated));
-    try {
-      await sbFetch('admin_status', 'POST', { week_key: 'notices_class_data', data: updated }, '?on_conflict=week_key');
-    } catch(e) {}
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: 'notices_class_data', data: updated }]);
+    }
     alert("공지 및 협의사항이 저장되었습니다.");
   };
 
@@ -411,9 +400,9 @@ function App() {
     setNoticeInput("");
     setIsNoticeEditing(false);
     localStorage.setItem("sp_notices", JSON.stringify(updated));
-    try {
-      await sbFetch('admin_status', 'POST', { week_key: 'notices_class_data', data: updated }, '?on_conflict=week_key');
-    } catch(e) {}
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: 'notices_class_data', data: updated }]);
+    }
     alert("공지 및 협의사항이 삭제되었습니다.");
   };
 
@@ -434,12 +423,13 @@ function App() {
   const [pwCheckError, setPwCheckError] = useState("");
 
   const fetchAllData = useCallback(async () => {
+    if (!supabase) return;
     try {
-      const dbEvents = await sbFetch('events', 'GET', null, '?select=*');
+      const { data: dbEvents } = await supabase.from('events').select('*');
       if (dbEvents) setEvents(dbEvents);
     } catch(e) {}
     try {
-      const dbAdmin = await sbFetch('admin_status', 'GET', null, '?select=*');
+      const { data: dbAdmin } = await supabase.from('admin_status').select('*');
       if (dbAdmin) {
         dbAdmin.forEach(item => {
           if (item.week_key === 'custom_holidays_data') {
@@ -455,13 +445,14 @@ function App() {
         });
       }
     } catch(e) {}
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     fetchAllData();
+    if (!supabase) return;
     const timer = setInterval(fetchAllData, 5000);
     return () => clearInterval(timer);
-  }, [fetchAllData]);
+  }, [supabase, fetchAllData]);
 
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
@@ -535,11 +526,9 @@ function App() {
     }
 
     const idsArr = Array.from(selectedEventIds);
-    try {
-      for (const id of idsArr) {
-        await sbFetch('events', 'DELETE', null, `?id=eq.${id}`);
-      }
-    } catch(e) {}
+    if (supabase) {
+      await supabase.from('events').delete().in('id', idsArr);
+    }
     setEvents(prev => prev.filter(ev => !selectedEventIds.has(ev.id)));
     setSelectedEventIds(new Set());
     setDeleteModalOpen(false);
@@ -728,11 +717,12 @@ function App() {
         password: eventPassword
       };
 
-      try {
-        await sbFetch('events', 'POST', newEv);
-      } catch (error) {
-        alert("저장 실패: " + error.message);
-        return;
+      if (supabase) {
+        const { error } = await supabase.from('events').insert([newEv]);
+        if (error) {
+          alert("저장 실패: " + error.message);
+          return;
+        }
       }
       setEvents(prev => [...prev, newEv]);
       setEventModal(null);
@@ -747,11 +737,12 @@ function App() {
         content: form.content,
         manager: finalManager
       };
-      try {
-        await sbFetch('events', 'PATCH', updatePayload, `?id=eq.${eventModal.data.id}`);
-      } catch (error) {
-        alert("수정 실패: " + error.message);
-        return;
+      if (supabase) {
+        const { error } = await supabase.from('events').update(updatePayload).eq('id', eventModal.data.id);
+        if (error) {
+          alert("수정 실패: " + error.message);
+          return;
+        }
       }
       setEvents((prev) => prev.map((e) => (e.id === eventModal.data.id ? { ...e, ...updatePayload } : e)));
       setEventModal(null);
@@ -763,9 +754,9 @@ function App() {
       setPwCheckError("비밀번호가 일치하지 않습니다.");
       return;
     }
-    try {
-      await sbFetch('events', 'DELETE', null, `?id=eq.${eventModal.data.id}`);
-    } catch(e) {}
+    if (supabase) {
+      await supabase.from('events').delete().eq('id', eventModal.data.id);
+    }
     setEvents((prev) => prev.filter((e) => e.id !== eventModal.data.id));
     setEventModal(null);
   };
@@ -1076,9 +1067,9 @@ function App() {
                     const updated = { ...customHolidays, [selectedHolidayDate]: holidayNameInput.trim() };
                     setCustomHolidays(updated);
                     localStorage.setItem("sp_custom_holidays", JSON.stringify(updated));
-                    try {
-                      await sbFetch('admin_status', 'POST', { week_key: 'custom_holidays_data', data: updated }, '?on_conflict=week_key');
-                    } catch(e) {}
+                    if (supabase) {
+                      await supabase.from('admin_status').upsert([{ week_key: 'custom_holidays_data', data: updated }]);
+                    }
                     alert("등록되었습니다.");
                   }}
                   className="w-full sm:w-auto rounded-lg bg-rose-500 px-4 py-2 text-xs font-bold text-white hover:bg-rose-600 transition shadow-sm"
@@ -1183,7 +1174,7 @@ function App() {
                     <button onClick={copyCurrentEvent} className="flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm font-bold text-violet-600 hover:bg-violet-100 transition"><CopyIcon size={15} /> 복사</button>
                   </>
                 )}
-                <button onClick={() => setEventModal(null)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">C취소</button>
+                <button onClick={() => setEventModal(null)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
                 <button onClick={saveEvent} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">{eventModal.mode === "add" ? "추가" : "수정"}</button>
               </div>
             </div>
