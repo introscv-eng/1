@@ -76,6 +76,9 @@ const SettingsIcon = ({ size = 15, className = "" }) => (
 const ShieldAlertIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
 );
+const UploadCloudIcon = ({ size = 15, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+);
 
 const GRADES = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
 const DEFAULT_CLASS_CONFIG = {
@@ -137,7 +140,7 @@ function Badge({ className = "", children }) {
 function Modal({ title, onClose, children, wide = false }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm overflow-y-auto">
-      <div className={`w-full ${wide ? "max-w-xl" : "max-w-sm"} rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 relative my-8`}>
+      <div className={`w-full ${wide ? "max-w-2xl" : "max-w-sm"} rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 relative my-8`}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-800">{title}</h3>
           <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
@@ -286,7 +289,6 @@ function App() {
   const [cfgSpecialists, setCfgSpecialists] = useState(["전담1", "전담2"]);
   const [newSpecialistInput, setNewSpecialistInput] = useState("");
 
-  // 비밀번호 관리 모달 상태 (새 비밀번호 + 비밀번호 확인)
   const [selectedPwGrade, setSelectedPwGrade] = useState(selectedGrade);
   const [selectedPwClass, setSelectedPwClass] = useState("1반");
   const [customNewPwInput, setCustomNewPwInput] = useState("");
@@ -515,7 +517,6 @@ function App() {
     alert(`${editingConfigGrade}의 학급 및 전담 설정이 적용되었습니다.`);
   };
 
-  // 학급 비밀번호 변경 (일치 여부 검증)
   const handleChangeClassPw = async () => {
     const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
     const newPw = customNewPwInput.trim();
@@ -541,7 +542,6 @@ function App() {
     alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 성공적으로 변경되었습니다.`);
   };
 
-  // 관리자 전용: 학급 비밀번호 '1234'로 초기화
   const handleAdminResetClassPw = async () => {
     if (!isAdminMode) {
       alert("비밀번호 초기화는 관리자 모드에서만 가능합니다.");
@@ -559,7 +559,6 @@ function App() {
     alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 기본값 '1234'로 초기화되었습니다.`);
   };
 
-  // 마스터 관리자 비밀번호 변경 (관리자 모드 전용)
   const handleSaveMasterPassword = async () => {
     if (!isAdminMode) {
       alert("마스터 비밀번호 변경은 관리자 모드에서만 가능합니다.");
@@ -579,6 +578,96 @@ function App() {
   };
 
   const [events, setEvents] = useState([]);
+
+  // CSV 일괄 업로드 모달 관련 상태
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [csvParsedData, setCsvParsedData] = useState([]);
+  const [csvFileName, setCsvFileName] = useState("");
+  const [csvError, setCsvError] = useState("");
+
+  const downloadCsvTemplate = () => {
+    const csvHeaders = "날짜,학년,학급또는전담,행사내용,일정분야,담당자,비밀번호\n";
+    const sampleRows = [
+      "2026-09-01,1학년,1반,입학식/개학식,학습,홍길동,1234",
+      "2026-09-02,1학년,학년 공통,신체검사(1반, 2반, 3반),학년 공통,전체,1234",
+      "2026-09-05,2학년,영어전담,영어 진단평가,학습,이순신,1234"
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvHeaders + sampleRows], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", "일정_일괄업로드_양식.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleCsvFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setCsvFileName(file.name);
+    setCsvError("");
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target.result;
+        const lines = text.split(/\r\n|\n/).map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length <= 1) {
+          setCsvError("업로드한 파일에 데이터 행이 존재하지 않습니다.");
+          return;
+        }
+
+        const parsed = [];
+        // 첫 번째 행은 헤더이므로 index 1부터 시작
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ''));
+          if (cols.length < 4 || !cols[0] || !cols[3]) continue;
+
+          parsed.push({
+            id: Math.floor(Date.now() + Math.random() * 1000000 + i) % 2147483647,
+            date: cols[0],
+            grade: cols[1] || selectedGrade,
+            dept: cols[2] || (selectedClass || "1반"),
+            content: cols[3],
+            category: cols[4] || "학습",
+            manager: cols[5] || "",
+            password: cols[6] || "1234"
+          });
+        }
+
+        if (parsed.length === 0) {
+          setCsvError("올바른 일정 데이터를 읽어내지 못했습니다. CSV 템플릿 양식을 확인해 주세요.");
+        } else {
+          setCsvParsedData(parsed);
+        }
+      } catch (err) {
+        setCsvError("CSV 파일 분석 중 오류가 발생했습니다: " + err.message);
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
+  const handleConfirmBatchUpload = async () => {
+    if (csvParsedData.length === 0) {
+      alert("업로드할 유효한 일정이 없습니다.");
+      return;
+    }
+
+    if (supabase) {
+      const { error } = await supabase.from('events').insert(csvParsedData);
+      if (error) {
+        alert("일괄 업로드 실패: " + error.message);
+        return;
+      }
+    }
+
+    setEvents(prev => [...prev, ...csvParsedData]);
+    setCsvModalOpen(false);
+    setCsvParsedData([]);
+    setCsvFileName("");
+    alert(`총 ${csvParsedData.length}건의 일정이 성공적으로 일괄 등록되었습니다!`);
+  };
 
   const defaultScheduleRow = (dateStr) => ({
     date: dateStr || ymd(today),
@@ -610,7 +699,7 @@ function App() {
       if (dbEvents) setEvents(dbEvents);
     } catch(e) {}
     try {
-      const { data: dbAdmin } = await supabase.from('admin_status').select('*');
+      const dbAdmin = await supabase.from('admin_status').select('*');
       if (dbAdmin) {
         dbAdmin.forEach(item => {
           if (item.week_key === 'custom_holidays_data') {
@@ -1135,7 +1224,7 @@ function App() {
           </div>
         )}
 
-        {/* 상단 헤더 패널 (줄바꿈 방지 + 오늘의 행사 자동 표시) */}
+        {/* 상단 헤더 패널 */}
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
             <div className="min-w-0">
@@ -1287,7 +1376,7 @@ function App() {
           </div>
         </div>
 
-        {/* 선택 삭제 및 일정 추가 버튼 바 */}
+        {/* 선택 삭제 및 [CSV 일괄 업로드] & [일정 추가] 버튼 바 */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="ml-auto flex items-center gap-2">
             {selectedEventIds.size > 0 && (
@@ -1298,6 +1387,17 @@ function App() {
                 <Trash2Icon size={14} /> 선택 삭제 ({selectedEventIds.size})
               </button>
             )}
+
+            {/* CSV 일괄 업로드 버튼 */}
+            <button
+              onClick={() => { setCsvParsedData([]); setCsvFileName(""); setCsvError(""); setCsvModalOpen(true); }}
+              className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
+            >
+              <UploadCloudIcon size={15} className="text-indigo-600" />
+              <span>CSV 일괄 업로드</span>
+            </button>
+
+            {/* 기본 일정 추가 버튼 */}
             <button
               onClick={() => openAddEvent(tab === "month" ? ymd(today) : ymd(weekDates[0]))}
               className="flex items-center gap-1 rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-violet-200 hover:bg-violet-600 transition"
@@ -1333,6 +1433,105 @@ function App() {
             );
           })}
         </div>
+
+        {/* CSV 일괄 업로드 모달 */}
+        {csvModalOpen && (
+          <Modal title="일정 CSV 파일 일괄 업로드" onClose={() => setCsvModalOpen(false)} wide>
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+              {/* 상단 템플릿 다운로드 및 안내 */}
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-3.5 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-extrabold text-indigo-900 block">CSV 양식에 맞추어 업로드해 주세요</span>
+                    <span className="text-[11px] text-slate-500">엑셀에서 작성 후 'CSV UTF-8 (쉼표로 분리)' 형식으로 저장하여 업로드합니다.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={downloadCsvTemplate}
+                    className="flex items-center gap-1 rounded-xl bg-white border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shrink-0 shadow-2xs"
+                  >
+                    📄 양식 다운로드
+                  </button>
+                </div>
+              </div>
+
+              {/* 파일 업로드 드롭존 */}
+              <div>
+                <FieldLabel>CSV 파일 선택</FieldLabel>
+                <div className="flex items-center justify-center w-full">
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-2xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <UploadCloudIcon size={24} className="text-slate-400 mb-2" />
+                      <p className="text-xs font-bold text-slate-600">
+                        {csvFileName ? <span className="text-indigo-600 font-extrabold">{csvFileName}</span> : "클릭하여 CSV 파일 선택"}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">.csv 확장자 파일만 지원됩니다</p>
+                    </div>
+                    <input type="file" accept=".csv" onChange={handleCsvFileUpload} className="hidden" />
+                  </label>
+                </div>
+                {csvError && <p className="mt-2 text-xs font-semibold text-rose-500">{csvError}</p>}
+              </div>
+
+              {/* 파싱된 일정 미리보기 테이블 */}
+              {csvParsedData.length > 0 && (
+                <div className="space-y-2 border-t border-slate-100 pt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-800">
+                      업로드 준비 완료 ({csvParsedData.length}건)
+                    </span>
+                    <span className="text-[10px] text-emerald-600 font-bold">✓ 파일 검증 성공</span>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 overflow-hidden max-h-48 overflow-y-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-100 sticky top-0 text-slate-600 font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="p-2">날짜</th>
+                          <th className="p-2">학년/반</th>
+                          <th className="p-2">행사 내용</th>
+                          <th className="p-2">분야</th>
+                          <th className="p-2">담당자</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                        {csvParsedData.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/80">
+                            <td className="p-2 whitespace-nowrap">{row.date}</td>
+                            <td className="p-2 whitespace-nowrap">{row.grade} {row.dept}</td>
+                            <td className="p-2 truncate max-w-[180px]">{row.content}</td>
+                            <td className="p-2 whitespace-nowrap">
+                              <Badge className={getTagStyle(row.category)}>{row.category}</Badge>
+                            </td>
+                            <td className="p-2 whitespace-nowrap">{row.manager || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setCsvModalOpen(false)}
+                  className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  disabled={csvParsedData.length === 0}
+                  onClick={handleConfirmBatchUpload}
+                  className={`flex-1 rounded-xl py-2.5 text-sm font-bold text-white transition shadow-md ${csvParsedData.length > 0 ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 cursor-pointer" : "bg-slate-300 cursor-not-allowed"}`}
+                >
+                  {csvParsedData.length > 0 ? `총 ${csvParsedData.length}건 일괄 등록하기` : "파일을 선택해 주세요"}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
 
         {/* 공지사항 작성 모달 */}
         {noticeModalOpen && (
@@ -1416,7 +1615,6 @@ function App() {
         {classConfigModalOpen && (
           <Modal title="학급 구성 및 비밀번호 관리" onClose={() => setClassConfigModalOpen(false)} wide>
             <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-              {/* 1. 학급/전담 구성 */}
               <div className="rounded-2xl border border-violet-100 bg-violet-50/40 p-3.5 space-y-3">
                 <span className="text-xs font-extrabold text-violet-900 block">1. 학년별 학급 및 전담 구성</span>
                 <div>
@@ -1507,7 +1705,6 @@ function App() {
                 </button>
               </div>
 
-              {/* 2. 학급별 비밀번호 수정 (비밀번호 확인란 추가 + 초기화 버튼은 관리자 모드 전용) */}
               <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-extrabold text-indigo-900 block">2. 학급별 비밀번호 수정</span>
@@ -1576,7 +1773,6 @@ function App() {
                     비밀번호 변경
                   </button>
 
-                  {/* 관리자 모드에서만 초기화 버튼 노출 */}
                   {isAdminMode && (
                     <button
                       type="button"
@@ -1590,7 +1786,6 @@ function App() {
                 </div>
               </div>
 
-              {/* 3. 마스터 관리자 비밀번호 변경 (관리자 모드 전용) */}
               <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-3.5 space-y-2.5">
                 <span className="text-xs font-extrabold text-amber-900 block">3. 마스터 관리자 비밀번호 변경</span>
                 {isAdminMode ? (
