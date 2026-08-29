@@ -286,9 +286,11 @@ function App() {
   const [cfgSpecialists, setCfgSpecialists] = useState(["전담1", "전담2"]);
   const [newSpecialistInput, setNewSpecialistInput] = useState("");
 
+  // 비밀번호 관리 모달 상태 (새 비밀번호 + 비밀번호 확인)
   const [selectedPwGrade, setSelectedPwGrade] = useState(selectedGrade);
   const [selectedPwClass, setSelectedPwClass] = useState("1반");
   const [customNewPwInput, setCustomNewPwInput] = useState("");
+  const [customNewPwConfirm, setCustomNewPwConfirm] = useState("");
   const [editingMasterPwInput, setEditingMasterPwInput] = useState("");
 
   const activeClassList = useMemo(() => {
@@ -406,12 +408,10 @@ function App() {
   const [selectedHolidayDate, setSelectedHolidayDate] = useState(ymd(new Date()));
   const [holidayNameInput, setHolidayNameInput] = useState("재량휴업일");
 
-  // 공지사항 (학년 공통 및 학급별 분리 저장)
   const [notices, setNotices] = useState(() => {
     try { return JSON.parse(localStorage.getItem("sp_notices")) || {}; } catch { return {}; }
   });
 
-  // 기간 Key 생성기
   const getPeriodKey = (scopeType) => {
     const period = tab === "month" ? `${viewDate.getFullYear()}-${pad2(viewDate.getMonth() + 1)}` : ymd(startOfWeekMon(weekAnchor));
     if (scopeType === "grade") {
@@ -425,9 +425,8 @@ function App() {
   const gradeNoticeKey = getPeriodKey("grade");
   const classNoticeKey = getPeriodKey("class");
 
-  // 공지사항 글쓰기/수정 모달 상태
   const [noticeModalOpen, setNoticeModalOpen] = useState(false);
-  const [noticeScope, setNoticeScope] = useState("grade"); // 'grade' or 'class'
+  const [noticeScope, setNoticeScope] = useState("grade");
   const [modalNoticeText, setModalNoticeText] = useState("");
 
   const openNoticeEditModal = () => {
@@ -495,6 +494,7 @@ function App() {
     setSelectedPwGrade(selectedGrade);
     setSelectedPwClass("1반");
     setCustomNewPwInput("");
+    setCustomNewPwConfirm("");
     setEditingMasterPwInput(masterPassword);
     setClassConfigModalOpen(true);
   };
@@ -515,13 +515,21 @@ function App() {
     alert(`${editingConfigGrade}의 학급 및 전담 설정이 적용되었습니다.`);
   };
 
-  const handleResetOrChangeClassPw = async (isReset = false) => {
+  // 학급 비밀번호 변경 (일치 여부 검증)
+  const handleChangeClassPw = async () => {
     const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
-    const newPw = isReset ? "1234" : customNewPwInput.trim();
-    if (!isReset && !newPw) {
+    const newPw = customNewPwInput.trim();
+    const confirmPw = customNewPwConfirm.trim();
+
+    if (!newPw) {
       alert("새 비밀번호를 입력해주세요.");
       return;
     }
+    if (newPw !== confirmPw) {
+      alert("새 비밀번호와 비밀번호 확인이 일치하지 않습니다. 다시 확인해주세요.");
+      return;
+    }
+
     const updated = { ...classPasswords, [targetKey]: newPw };
     setClassPasswords(updated);
     localStorage.setItem("sp_class_passwords", JSON.stringify(updated));
@@ -529,10 +537,34 @@ function App() {
       await supabase.from('admin_status').upsert([{ week_key: 'class_passwords_data', data: updated }]);
     }
     setCustomNewPwInput("");
-    alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 '${newPw}'(으)로 ${isReset ? '초기화' : '변경'}되었습니다.`);
+    setCustomNewPwConfirm("");
+    alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 성공적으로 변경되었습니다.`);
   };
 
+  // 관리자 전용: 학급 비밀번호 '1234'로 초기화
+  const handleAdminResetClassPw = async () => {
+    if (!isAdminMode) {
+      alert("비밀번호 초기화는 관리자 모드에서만 가능합니다.");
+      return;
+    }
+    const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
+    const updated = { ...classPasswords, [targetKey]: "1234" };
+    setClassPasswords(updated);
+    localStorage.setItem("sp_class_passwords", JSON.stringify(updated));
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: 'class_passwords_data', data: updated }]);
+    }
+    setCustomNewPwInput("");
+    setCustomNewPwConfirm("");
+    alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 기본값 '1234'로 초기화되었습니다.`);
+  };
+
+  // 마스터 관리자 비밀번호 변경 (관리자 모드 전용)
   const handleSaveMasterPassword = async () => {
+    if (!isAdminMode) {
+      alert("마스터 비밀번호 변경은 관리자 모드에서만 가능합니다.");
+      return;
+    }
     const trimmed = editingMasterPwInput.trim();
     if (!trimmed) {
       alert("마스터 비밀번호를 입력해주세요.");
@@ -636,7 +668,6 @@ function App() {
     return map;
   }, [filteredEvents]);
 
-  // 오늘 날짜의 행사 목록 계산 (헤더 우측 카드용)
   const todayStr = ymd(today);
   const todayEvents = useMemo(() => {
     return sortEvents(eventsByDate[todayStr] || []);
@@ -1107,7 +1138,6 @@ function App() {
         {/* 상단 헤더 패널 (줄바꿈 방지 + 오늘의 행사 자동 표시) */}
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
-            {/* 좌측: 큰 제목 및 안내 문구 */}
             <div className="min-w-0">
               <h1 className="text-xl font-extrabold text-slate-900 sm:text-2xl whitespace-nowrap overflow-hidden text-ellipsis mb-1">
                 [{selectedGrade} {selectedClass ? selectedClass : "공통"}] 학급 및 전담 행사 관리 플래너
@@ -1119,7 +1149,6 @@ function App() {
               </p>
             </div>
 
-            {/* 우측: 오늘 날짜 및 오늘의 행사 자동 카드 */}
             <div className="shrink-0 flex flex-col items-start md:items-end justify-center rounded-xl bg-gradient-to-br from-violet-50 to-indigo-50/70 border border-violet-100 p-2.5 min-w-[200px] shadow-2xs">
               <div className="flex items-center gap-1.5 text-xs font-black text-violet-700 mb-1">
                 <span className="text-sm">📢</span>
@@ -1142,10 +1171,8 @@ function App() {
             </div>
           </div>
 
-          {/* 제목보다 약간 밑으로 이동한 관리 버튼들 & 학년/학급 선택 바 */}
           <div className="space-y-3 border-t border-slate-100 pt-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              {/* 학년 선택 바 */}
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-xs font-bold text-slate-500 mr-1.5">학년:</span>
                 {GRADES.map(g => (
@@ -1159,7 +1186,6 @@ function App() {
                 ))}
               </div>
 
-              {/* 우측 정렬된 관리 버튼 3총사 */}
               <div className="flex items-center gap-1.5 ml-auto">
                 <button
                   onClick={handleToggleAdminMode}
@@ -1182,7 +1208,6 @@ function App() {
               </div>
             </div>
 
-            {/* 학급/전담 선택 바 */}
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               <span className="text-xs font-bold text-slate-500 mr-1.5">학급/전담:</span>
               {activeClassList.map(c => (
@@ -1224,7 +1249,7 @@ function App() {
           </div>
         </div>
 
-        {/* 공지 및 협의사항 (학년 공통 + 학급별 동시 상시 표시 및 통합 모달 연동) */}
+        {/* 공지 및 협의사항 */}
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1240,7 +1265,6 @@ function App() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* 학년 공통 공지 */}
             <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white">학년 공통 공지</span>
@@ -1250,7 +1274,6 @@ function App() {
               </p>
             </div>
 
-            {/* 학급 전용 공지 */}
             <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-3 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="rounded bg-violet-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
@@ -1311,7 +1334,7 @@ function App() {
           })}
         </div>
 
-        {/* 공지사항 글쓰기/수정 모달 (드롭다운으로 학년공통/학급 선택) */}
+        {/* 공지사항 작성 모달 */}
         {noticeModalOpen && (
           <Modal title="공지 및 협의사항 작성" onClose={() => setNoticeModalOpen(false)} wide>
             <div className="space-y-4">
@@ -1393,6 +1416,7 @@ function App() {
         {classConfigModalOpen && (
           <Modal title="학급 구성 및 비밀번호 관리" onClose={() => setClassConfigModalOpen(false)} wide>
             <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+              {/* 1. 학급/전담 구성 */}
               <div className="rounded-2xl border border-violet-100 bg-violet-50/40 p-3.5 space-y-3">
                 <span className="text-xs font-extrabold text-violet-900 block">1. 학년별 학급 및 전담 구성</span>
                 <div>
@@ -1483,8 +1507,17 @@ function App() {
                 </button>
               </div>
 
+              {/* 2. 학급별 비밀번호 수정 (비밀번호 확인란 추가 + 초기화 버튼은 관리자 모드 전용) */}
               <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3.5 space-y-3">
-                <span className="text-xs font-extrabold text-indigo-900 block">2. 학급별 비밀번호 초기화 및 수정</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-indigo-900 block">2. 학급별 비밀번호 수정</span>
+                  {isAdminMode && (
+                    <span className="rounded bg-amber-100 border border-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                      👑 관리자 권한 활성
+                    </span>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <FieldLabel>대상 학년</FieldLabel>
@@ -1511,52 +1544,77 @@ function App() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
-                  <input
-                    type="password"
-                    value={customNewPwInput}
-                    onChange={(e) => setCustomNewPwInput(e.target.value)}
-                    placeholder="새 비밀번호 직접 입력"
-                    className="flex-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none"
-                  />
-                  <div className="flex items-center gap-1.5 w-full sm:w-auto">
-                    <button
-                      type="button"
-                      onClick={() => handleResetOrChangeClassPw(false)}
-                      className="flex-1 sm:flex-none rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition shrink-0"
-                    >
-                      비밀번호 변경
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleResetOrChangeClassPw(true)}
-                      className="flex-1 sm:flex-none rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition shrink-0"
-                      title="1234로 초기화"
-                    >
-                      '1234'로 초기화
-                    </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <FieldLabel>새 비밀번호</FieldLabel>
+                    <input
+                      type="password"
+                      value={customNewPwInput}
+                      onChange={(e) => setCustomNewPwInput(e.target.value)}
+                      placeholder="새 비밀번호 입력"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-indigo-400"
+                    />
                   </div>
+                  <div>
+                    <FieldLabel>새 비밀번호 확인</FieldLabel>
+                    <input
+                      type="password"
+                      value={customNewPwConfirm}
+                      onChange={(e) => setCustomNewPwConfirm(e.target.value)}
+                      placeholder="새 비밀번호 재입력"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-indigo-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleChangeClassPw}
+                    className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition shadow-xs"
+                  >
+                    비밀번호 변경
+                  </button>
+
+                  {/* 관리자 모드에서만 초기화 버튼 노출 */}
+                  {isAdminMode && (
+                    <button
+                      type="button"
+                      onClick={handleAdminResetClassPw}
+                      className="rounded-xl border border-rose-300 bg-white px-3.5 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition shrink-0"
+                      title="관리자 전용: '1234'로 즉시 초기화"
+                    >
+                      '1234'로 초기화 (관리자)
+                    </button>
+                  )}
                 </div>
               </div>
 
+              {/* 3. 마스터 관리자 비밀번호 변경 (관리자 모드 전용) */}
               <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-3.5 space-y-2.5">
                 <span className="text-xs font-extrabold text-amber-900 block">3. 마스터 관리자 비밀번호 변경</span>
-                <div className="flex flex-col sm:flex-row items-center gap-2">
-                  <input
-                    type="password"
-                    value={editingMasterPwInput}
-                    onChange={(e) => setEditingMasterPwInput(e.target.value)}
-                    placeholder="새 마스터 비밀번호"
-                    className="flex-1 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-amber-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveMasterPassword}
-                    className="w-full sm:w-auto rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700 transition shrink-0 shadow-xs"
-                  >
-                    마스터 비밀번호 변경
-                  </button>
-                </div>
+                {isAdminMode ? (
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <input
+                      type="password"
+                      value={editingMasterPwInput}
+                      onChange={(e) => setEditingMasterPwInput(e.target.value)}
+                      placeholder="새 마스터 비밀번호"
+                      className="flex-1 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveMasterPassword}
+                      className="w-full sm:w-auto rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700 transition shrink-0 shadow-xs"
+                    >
+                      마스터 비밀번호 변경
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-800 bg-amber-100/70 border border-amber-200 rounded-xl p-2.5">
+                    🔒 마스터 관리자 비밀번호 변경은 상단 <b>[관리자 모드]</b>를 켠 상태에서만 가능합니다.
+                  </p>
+                )}
               </div>
 
               <div className="pt-2 border-t border-slate-100">
