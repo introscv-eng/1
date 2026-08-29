@@ -535,7 +535,6 @@ function App() {
     setCfgClassCount(cfg.classCount || 6);
     setCfgSpecialists(cfg.specialists || ["전담1", "전담2"]);
     
-    // 일반 모드일 경우 기본 선택된 학년/학급을 현재 내 반으로 고정
     if (!isAdminMode && selectedClass) {
       setSelectedPwGrade(selectedGrade);
       setSelectedPwClass(selectedClass);
@@ -823,7 +822,6 @@ function App() {
   const confirmSchoolAuth = () => {
     if (!pendingSchoolChange) return;
     const { office, school } = pendingSchoolChange;
-    // 오직 마스터 비밀번호로만 검증
     if (schoolAuthPwInput !== masterPassword) {
       alert("관리자 비밀번호가 일치하지 않습니다. 틀렸습니다.");
       return;
@@ -1557,7 +1555,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
             <p className="mb-3 text-xs text-slate-500 leading-relaxed">
               해당 학교 플래너에 접속하려면 관리자 비밀번호를 입력해주세요.
             </p>
-            <FieldLabel>관리자 비밀번호</FieldLabel>
+            <FieldLabel>관리자 비밀번호 (초기 비밀번호: admin1234)</FieldLabel>
             <input
               type="password"
               autoFocus
@@ -2028,7 +2026,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
         {/* 관리자 모드 인증 모달 */}
         {adminAuthModalOpen && (
           <Modal title="마스터 관리자 인증" onClose={() => setAdminAuthModalOpen(false)}>
-            <FieldLabel>마스터 비밀번호</FieldLabel>
+            <FieldLabel>마스터 비밀번호 (초기 비밀번호: admin1234)</FieldLabel>
             <input
               type="password"
               autoFocus
