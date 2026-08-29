@@ -163,8 +163,10 @@ function getHolidayName(dateStr, customHolidays) {
 function sortEvents(events) {
   const catOrder = EVENT_CATEGORIES;
   return [...events].sort((a, b) => {
-    const idxA = catOrder.indexOf(a.category);
-    const idxB = catOrder.indexOf(b.category);
+    const catA = a.dept || a.category || "학습";
+    const catB = b.dept || b.category || "학습";
+    const idxA = catOrder.indexOf(catA);
+    const idxB = catOrder.indexOf(catB);
     if (idxA !== idxB) return (idxA !== -1 ? idxA : 999) - (idxB !== -1 ? idxB : 999);
     return (a.content || "").localeCompare(b.content || "", "ko");
   });
@@ -210,6 +212,7 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
         ) : (
           sortedEvents.map((ev) => {
             const isChecked = selectedEventIds.has(ev.id);
+            const badgeLabel = ev.dept || ev.category || "학습";
             return (
               <div key={ev.id} className="flex items-center gap-2 group">
                 <input
@@ -220,7 +223,7 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
                   title="개별 일정 선택"
                 />
                 <button onClick={() => onOpenEvent(ev)} className="flex flex-1 items-center gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-slate-100/85 transition min-w-0">
-                  <Badge className={getTagStyle(ev.category)}>{ev.category}</Badge>
+                  <Badge className={getTagStyle(badgeLabel)}>{badgeLabel}</Badge>
                   <span className="pt-0.5 text-[13px] leading-snug text-slate-700 font-medium truncate">{ev.content}</span>
                   {ev.manager && (
                     <span className="ml-auto shrink-0 pt-0.5 text-[13px] leading-snug text-slate-700 font-medium pl-2">
@@ -246,7 +249,6 @@ function App() {
   const [viewDate, setViewDate] = useState(new Date());
   const [weekAnchor, setWeekAnchor] = useState(new Date());
 
-  // 마지막 저장된 학년/반 불러오기 (기본값: 1학년 1반)
   const [selectedGrade, setSelectedGrade] = useState(() => localStorage.getItem("sp_last_grade") || "1학년");
   const [selectedClass, setSelectedClass] = useState(() => localStorage.getItem("sp_last_class") || "1반");
 
@@ -463,10 +465,12 @@ function App() {
     return () => clearInterval(timer);
   }, [supabase, fetchAllData]);
 
+  // 기존 DB 호환을 위해 dept와 category를 모두 포용하여 필터링
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (e.grade !== selectedGrade) return false;
-      if (e.category === "학년 공통") {
+      const cat = e.dept || e.category;
+      if (cat === "학년 공통") {
         if (!e.targetList || e.targetList.length === 0) return true;
         return e.targetList.includes(selectedClass);
       }
@@ -478,7 +482,7 @@ function App() {
     const map = {};
     filteredEvents.forEach((e) => {
       if (!map[e.date]) map[e.date] = [];
-      const isDuplicate = map[e.date].some(item => item.id === e.id || (item.content === e.content && item.category === e.category && item.date === e.date));
+      const isDuplicate = map[e.date].some(item => item.id === e.id || (item.content === e.content && (item.dept || item.category) === (e.dept || e.category) && item.date === e.date));
       if (!isDuplicate) {
         map[e.date].push(e);
       }
@@ -607,7 +611,8 @@ function App() {
         const contents = [];
         const managers = [];
         evList.forEach(ev => {
-          contents.push(`[${ev.category}] ${ev.content}`);
+          const badgeLabel = ev.dept || ev.category || "학습";
+          contents.push(`[${badgeLabel}] ${ev.content}`);
           managers.push(ev.manager ? ev.manager : "-");
         });
         contentRaw = contents.join("\n");
@@ -671,9 +676,10 @@ function App() {
   };
 
   const openEditEvent = (ev) => {
+    const cat = ev.dept || ev.category || "학습";
     setForm({
       date: ev.date,
-      category: ev.category,
+      category: cat,
       content: ev.content,
       manager: ev.manager || "",
       password: ev.password,
@@ -709,7 +715,7 @@ function App() {
         date: form.date,
         grade: selectedGrade,
         classNum: isGradeCommon ? "ALL" : selectedClass,
-        category: form.category,
+        dept: form.category,
         content: form.content,
         manager: form.manager,
         password: eventPassword,
@@ -732,7 +738,7 @@ function App() {
       }
       const updatePayload = {
         date: form.date,
-        category: form.category,
+        dept: form.category,
         content: form.content,
         manager: form.manager,
         classNum: isGradeCommon ? "ALL" : selectedClass,
@@ -1111,7 +1117,6 @@ function App() {
                 </select>
               </div>
 
-              {/* '학년 공통' 선택 시 전체 등록 또는 특정 학급/전담 선택 옵션 제공 */}
               {form.category === "학년 공통" && (
                 <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-3.5 space-y-2.5">
                   <FieldLabel>학년 공통 적용 대상</FieldLabel>
