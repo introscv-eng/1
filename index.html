@@ -128,7 +128,7 @@ function Badge({ className = "", children }) {
 function Modal({ title, onClose, children, wide = false }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm overflow-y-auto">
-      <div className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 relative my-8`}>
+      <div className={`w-full ${wide ? "max-w-xl" : "max-w-sm"} rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 relative my-8`}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-800">{title}</h3>
           <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
@@ -363,7 +363,6 @@ function App() {
     setIsNoticeEditing(true);
   };
 
-  // 공식 Supabase JS 라이브러리 연동
   const supabase = useMemo(() => {
     if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
       try { 
@@ -408,15 +407,23 @@ function App() {
 
   const [events, setEvents] = useState([]);
 
+  // 다중 일정 및 반복 지원 입력 폼 기본 상태
+  const defaultScheduleRow = (dateStr) => ({
+    date: dateStr || ymd(today),
+    targetType: "all",
+    selectedTargets: [...classList]
+  });
+
   const emptyForm = { 
-    date: ymd(today), 
-    category: "학습", 
+    category: "학년 공통", 
     content: "", 
     manager: "", 
-    password: "", 
-    targetType: "all", 
-    selectedTargets: [] 
+    password: "",
+    schedules: [defaultScheduleRow(ymd(today))],
+    repeatType: "none", // none, weekly, biweekly
+    repeatCount: 1
   };
+
   const [eventModal, setEventModal] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [pwCheckInput, setPwCheckInput] = useState("");
@@ -470,7 +477,7 @@ function App() {
     const map = {};
     filteredEvents.forEach((e) => {
       if (!map[e.date]) map[e.date] = [];
-      const isDuplicate = map[e.date].some(item => item.id === e.id || (item.content === e.content && item.dept === e.dept && item.date === e.date));
+      const isDuplicate = map[e.date].some(item => item.id === e.id);
       if (!isDuplicate) {
         map[e.date].push(e);
       }
@@ -645,18 +652,22 @@ function App() {
   };
 
   const openAddEvent = (dateStr) => {
+    const baseDate = dateStr || ymd(today);
     if (copiedEvent) {
       setForm({
-        date: dateStr || ymd(today),
-        category: copiedEvent.category || "학습",
+        category: copiedEvent.category || "학년 공통",
         content: copiedEvent.content || "",
         manager: copiedEvent.manager || "",
         password: copiedEvent.password || "",
-        targetType: copiedEvent.targetType || "all",
-        selectedTargets: copiedEvent.selectedTargets || []
+        schedules: [defaultScheduleRow(baseDate)],
+        repeatType: "none",
+        repeatCount: 1
       });
     } else {
-      setForm({ ...emptyForm, date: dateStr || ymd(today), selectedTargets: [...classList] });
+      setForm({
+        ...emptyForm,
+        schedules: [defaultScheduleRow(baseDate)]
+      });
     }
     setPwCheckInput("");
     setPwCheckError("");
@@ -665,14 +676,21 @@ function App() {
 
   const openEditEvent = (ev) => {
     const cat = ev.dept || "학습";
+    const isGradeCommon = cat === "학년 공통";
+    const isCustomTarget = isGradeCommon && ev.manager && ev.manager !== "전체";
+
     setForm({
-      date: ev.date,
       category: cat,
       content: ev.content,
-      manager: ev.manager || "",
+      manager: !isGradeCommon ? (ev.manager || "") : "",
       password: ev.password,
-      targetType: ev.manager && ev.manager !== "전체" ? "custom" : "all",
-      selectedTargets: ev.manager && ev.manager !== "전체" ? ev.manager.split(", ") : [...classList]
+      schedules: [{
+        date: ev.date,
+        targetType: isCustomTarget ? "custom" : "all",
+        selectedTargets: isCustomTarget ? ev.manager.split(", ") : [...classList]
+      }],
+      repeatType: "none",
+      repeatCount: 1
     });
     setPwCheckInput("");
     setPwCheckError("");
@@ -685,58 +703,103 @@ function App() {
       category: form.category, 
       content: form.content, 
       manager: form.manager, 
-      password: form.password, 
-      targetType: form.targetType,
-      selectedTargets: form.selectedTargets
+      password: form.password
     });
     setEventModal(null);
   };
 
+  // 일정 행 추가 및 삭제
+  const addScheduleRow = () => {
+    const lastRow = form.schedules[form.schedules.length - 1];
+    const newDate = lastRow ? lastRow.date : ymd(today);
+    setForm(prev => ({
+      ...prev,
+      schedules: [...prev.schedules, defaultScheduleRow(newDate)]
+    }));
+  };
+
+  const removeScheduleRow = (index) => {
+    if (form.schedules.length <= 1) return;
+    setForm(prev => ({
+      ...prev,
+      schedules: prev.schedules.filter((_, idx) => idx !== index)
+    }));
+  };
+
+  const updateScheduleRow = (index, field, value) => {
+    setForm(prev => {
+      const nextSchedules = [...prev.schedules];
+      nextSchedules[index] = { ...nextSchedules[index], [field]: value };
+      return { ...prev, schedules: nextSchedules };
+    });
+  };
+
   const saveEvent = async () => {
-    if (!form.content.trim()) return;
+    if (!form.content.trim()) {
+      alert("행사 내용을 입력해주세요.");
+      return;
+    }
     const isGradeCommon = form.category === "학년 공통";
     const eventPassword = form.password.trim() || currentClassPassword;
 
-    let finalManager = form.manager;
-    if (isGradeCommon) {
-      if (form.targetType === "all") {
-        finalManager = "전체";
-      } else {
-        finalManager = form.selectedTargets.join(", ");
-      }
-    }
-
     if (eventModal.mode === "add") {
-      const newEv = {
-        id: Math.floor(Date.now() % 2147483647),
-        date: form.date,
-        grade: selectedGrade,
-        dept: isGradeCommon ? "학년 공통" : selectedClass,
-        content: form.content,
-        manager: finalManager,
-        password: eventPassword
-      };
+      const newEvents = [];
+      const repeatDays = form.repeatType === "weekly" ? 7 : form.repeatType === "biweekly" ? 14 : 0;
+      const count = form.repeatType === "none" ? 1 : Math.max(1, parseInt(form.repeatCount, 10) || 1);
+
+      for (let r = 0; r < count; r++) {
+        for (const row of form.schedules) {
+          const baseDateObj = new Date(row.date);
+          const calculatedDateObj = addDays(baseDateObj, r * repeatDays);
+          const targetDateStr = ymd(calculatedDateObj);
+
+          let finalManager = form.manager;
+          if (isGradeCommon) {
+            finalManager = row.targetType === "all" ? "전체" : row.selectedTargets.join(", ");
+          }
+
+          newEvents.push({
+            id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
+            date: targetDateStr,
+            grade: selectedGrade,
+            dept: isGradeCommon ? "학년 공통" : selectedClass,
+            content: form.content,
+            manager: finalManager,
+            password: eventPassword
+          });
+        }
+      }
 
       if (supabase) {
-        const { error } = await supabase.from('events').insert([newEv]);
+        const { error } = await supabase.from('events').insert(newEvents);
         if (error) {
           alert("저장 실패: " + error.message);
           return;
         }
       }
-      setEvents(prev => [...prev, newEv]);
+      setEvents(prev => [...prev, ...newEvents]);
       setEventModal(null);
+      alert(`총 ${newEvents.length}건의 일정이 등록되었습니다.`);
     } else {
+      // 수정 모드
       if (pwCheckInput !== eventModal.data.password && pwCheckInput !== currentClassPassword) {
         setPwCheckError("비밀번호가 일치하지 않습니다.");
         return;
       }
+
+      const row = form.schedules[0];
+      let finalManager = form.manager;
+      if (isGradeCommon) {
+        finalManager = row.targetType === "all" ? "전체" : row.selectedTargets.join(", ");
+      }
+
       const updatePayload = {
-        date: form.date,
+        date: row.date,
         dept: isGradeCommon ? "학년 공통" : selectedClass,
         content: form.content,
         manager: finalManager
       };
+
       if (supabase) {
         const { error } = await supabase.from('events').update(updatePayload).eq('id', eventModal.data.id);
         if (error) {
@@ -744,8 +807,9 @@ function App() {
           return;
         }
       }
-      setEvents((prev) => prev.map((e) => (e.id === eventModal.data.id ? { ...e, ...updatePayload } : e)));
+      setEvents(prev => prev.map(e => e.id === eventModal.data.id ? { ...e, ...updatePayload } : e));
       setEventModal(null);
+      alert("일정이 성공적으로 수정되었습니다.");
     }
   };
 
@@ -1083,99 +1147,234 @@ function App() {
           </Modal>
         )}
 
-        {/* 일정 추가/수정 모달 */}
+        {/* 일정 추가/수정 모달 (개선: 반별 분할 배정 및 주간 반복 지원) */}
         {eventModal && (
-          <Modal title={eventModal.mode === "add" ? "일정 추가" : "일정 수정"} onClose={() => setEventModal(null)} wide>
-            <div className="space-y-3">
-              <div>
-                <FieldLabel>날짜</FieldLabel>
-                <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={inputCls} />
-              </div>
-              <div>
-                <FieldLabel>일정 분야</FieldLabel>
-                <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputCls}>
-                  {EVENT_CATEGORIES.map((cat) => ( <option key={cat} value={cat}>{cat}</option> ))}
-                </select>
+          <Modal title={eventModal.mode === "add" ? "일정 일괄 추가" : "일정 수정"} onClose={() => setEventModal(null)} wide>
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+              {/* 분야 선택 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <FieldLabel>일정 분야</FieldLabel>
+                  <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputCls}>
+                    {EVENT_CATEGORIES.map((cat) => ( <option key={cat} value={cat}>{cat}</option> ))}
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>담당자 (선택)</FieldLabel>
+                  <input 
+                    type="text" 
+                    value={form.manager} 
+                    onChange={(e) => setForm({ ...form, manager: e.target.value })} 
+                    className={inputCls} 
+                    placeholder="예) 홍길동" 
+                  />
+                </div>
               </div>
 
-              {form.category === "학년 공통" && (
-                <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-3.5 space-y-2.5">
-                  <FieldLabel>학년 공통 적용 대상</FieldLabel>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="targetType" 
-                        checked={form.targetType === "all"} 
-                        onChange={() => setForm({ ...form, targetType: "all" })}
-                        className="text-violet-600 focus:ring-violet-400"
-                      />
-                      전체 등록 (모든 반 및 전담)
-                    </label>
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="targetType" 
-                        checked={form.targetType === "custom"} 
-                        onChange={() => setForm({ ...form, targetType: "custom", selectedTargets: [...classList] })}
-                        className="text-violet-600 focus:ring-violet-400"
-                      />
-                      특정 학급/전담 지정
-                    </label>
-                  </div>
+              {/* 행사 내용 */}
+              <div>
+                <FieldLabel>행사 내용</FieldLabel>
+                <textarea 
+                  value={form.content} 
+                  onChange={(e) => setForm({ ...form, content: e.target.value })} 
+                  rows={2} 
+                  className={inputCls} 
+                  placeholder="예) 중국어 교육 (1~5반 8일, 6반 9일 등)" 
+                />
+              </div>
 
-                  {form.targetType === "custom" && (
-                    <div className="pt-2 border-t border-violet-200/60 flex flex-wrap gap-2">
-                      {classList.map(c => {
-                        const isChecked = form.selectedTargets.includes(c);
-                        return (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => {
-                              const next = isChecked ? form.selectedTargets.filter(item => item !== c) : [...form.selectedTargets, c];
-                              setForm({ ...form, selectedTargets: next });
-                            }}
-                            className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition ${isChecked ? "bg-violet-600 text-white border-violet-600 shadow-2xs" : "bg-white text-slate-600 border-slate-200 hover:bg-violet-50"}`}
-                          >
-                            {isChecked ? `✓ ${c}` : `+ ${c}`}
-                          </button>
-                        );
-                      })}
-                    </div>
+              {/* 날짜 및 대상 학급 배정 섹션 */}
+              <div className="space-y-3 rounded-2xl border border-violet-100 bg-violet-50/40 p-3.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-violet-900">
+                    {form.category === "학년 공통" ? "날짜별 학급/전담 배정 목록" : "일정 날짜"}
+                  </span>
+                  {eventModal.mode === "add" && form.category === "학년 공통" && (
+                    <button
+                      type="button"
+                      onClick={addScheduleRow}
+                      className="flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-violet-700 transition shadow-xs"
+                    >
+                      <PlusIcon size={12} /> 날짜 및 반 배정 행 추가
+                    </button>
                   )}
+                </div>
+
+                {form.schedules.map((row, idx) => (
+                  <div key={idx} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-[11px] font-bold text-slate-400 shrink-0">#{idx + 1}</span>
+                        <input 
+                          type="date" 
+                          value={row.date} 
+                          onChange={(e) => updateScheduleRow(idx, "date", e.target.value)} 
+                          className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 outline-none focus:border-violet-400 font-semibold" 
+                        />
+                      </div>
+                      {eventModal.mode === "add" && form.schedules.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeScheduleRow(idx)}
+                          className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition"
+                          title="이 행 삭제"
+                        >
+                          <Trash2Icon size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    {form.category === "학년 공통" && (
+                      <div className="space-y-2 border-t border-slate-100 pt-2">
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer">
+                            <input 
+                              type="radio" 
+                              name={`targetType_${idx}`} 
+                              checked={row.targetType === "all"} 
+                              onChange={() => updateScheduleRow(idx, "targetType", "all")}
+                              className="text-violet-600 focus:ring-violet-400"
+                            />
+                            전체 등록
+                          </label>
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer">
+                            <input 
+                              type="radio" 
+                              name={`targetType_${idx}`} 
+                              checked={row.targetType === "custom"} 
+                              onChange={() => updateScheduleRow(idx, "targetType", "custom")}
+                              className="text-violet-600 focus:ring-violet-400"
+                            />
+                            특정 학급 지정
+                          </label>
+                        </div>
+
+                        {row.targetType === "custom" && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {classList.map(c => {
+                              const isChecked = row.selectedTargets.includes(c);
+                              return (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() => {
+                                    const next = isChecked 
+                                      ? row.selectedTargets.filter(item => item !== c) 
+                                      : [...row.selectedTargets, c];
+                                    updateScheduleRow(idx, "selectedTargets", next);
+                                  }}
+                                  className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition ${isChecked ? "bg-violet-600 text-white border-violet-600 shadow-2xs" : "bg-white text-slate-600 border-slate-200 hover:bg-violet-50"}`}
+                                >
+                                  {isChecked ? `✓ ${c}` : `+ ${c}`}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* 주 단위 일괄 반복 옵션 (추가 모드에서만 활성화) */}
+              {eventModal.mode === "add" && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <FieldLabel>주간 일정 일괄 반복 생성</FieldLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select 
+                      value={form.repeatType} 
+                      onChange={(e) => setForm({ ...form, repeatType: e.target.value })} 
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none"
+                    >
+                      <option value="none">반복 없음 (1회만 등록)</option>
+                      <option value="weekly">매주 반복 (다음 주, 다다음 주...)</option>
+                      <option value="biweekly">2주 간격 반복</option>
+                    </select>
+
+                    {form.repeatType !== "none" ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-500 shrink-0">총</span>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max="16" 
+                          value={form.repeatCount} 
+                          onChange={(e) => setForm({ ...form, repeatCount: e.target.value })} 
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none" 
+                        />
+                        <span className="text-xs font-bold text-slate-500 shrink-0">주 동안</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center text-[11px] text-slate-400 pl-1">
+                        * 다음 주 연속 수업 시 매주 반복을 선택하세요.
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
-              <div>
-                <FieldLabel>행사 내용</FieldLabel>
-                <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={2} className={inputCls} placeholder="예) 현장체험학습 (서울랜드)" />
-              </div>
-              <div>
-                <FieldLabel>담당자 (선택)</FieldLabel>
-                <input type="text" value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} className={inputCls} placeholder="예) 홍길동" />
-              </div>
+              {/* 비밀번호 입력 */}
               {eventModal.mode === "add" ? (
                 <div>
                   <FieldLabel>비밀번호 (수정/삭제 시 사용할 비밀번호)</FieldLabel>
-                  <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputCls} placeholder="미입력 시 기본 비밀번호 적용" />
+                  <input 
+                    type="password" 
+                    value={form.password} 
+                    onChange={(e) => setForm({ ...form, password: e.target.value })} 
+                    className={inputCls} 
+                    placeholder="미입력 시 기본 비밀번호 적용" 
+                  />
                 </div>
               ) : (
                 <div>
                   <FieldLabel>비밀번호</FieldLabel>
-                  <input type="password" value={pwCheckInput} onChange={(e) => setPwCheckInput(e.target.value)} className={inputCls} placeholder="비밀번호 입력" />
+                  <input 
+                    type="password" 
+                    value={pwCheckInput} 
+                    onChange={(e) => setPwCheckInput(e.target.value)} 
+                    className={inputCls} 
+                    placeholder="비밀번호 입력" 
+                  />
                 </div>
               )}
+
               {pwCheckError && <p className="text-xs font-semibold text-rose-500">{pwCheckError}</p>}
-              <div className="flex items-center gap-2 pt-1">
+
+              {/* 하단 버튼 바 */}
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                 {eventModal.mode === "edit" && (
                   <>
-                    <button onClick={deleteEvent} className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-100 transition"><Trash2Icon size={15} /> 삭제</button>
-                    <button onClick={copyCurrentEvent} className="flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm font-bold text-violet-600 hover:bg-violet-100 transition"><CopyIcon size={15} /> 복사</button>
+                    <button 
+                      type="button" 
+                      onClick={deleteEvent} 
+                      className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-100 transition"
+                    >
+                      <Trash2Icon size={15} /> 삭제
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={copyCurrentEvent} 
+                      className="flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm font-bold text-violet-600 hover:bg-violet-100 transition"
+                    >
+                      <CopyIcon size={15} /> 복사
+                    </button>
                   </>
                 )}
-                <button onClick={() => setEventModal(null)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
-                <button onClick={saveEvent} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">{eventModal.mode === "add" ? "추가" : "수정"}</button>
+                <button 
+                  type="button" 
+                  onClick={() => setEventModal(null)} 
+                  className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition"
+                >
+                  취소
+                </button>
+                <button 
+                  type="button" 
+                  onClick={saveEvent} 
+                  className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition shadow-md shadow-violet-200"
+                >
+                  {eventModal.mode === "add" ? "일괄 추가하기" : "수정하기"}
+                </button>
               </div>
             </div>
           </Modal>
