@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>학급 및 전담 행사 관리 플래너</title>
+<!-- Tailwind CSS & React & Supabase CDN -->
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -251,7 +252,6 @@ function App() {
   const [tempGrade, setTempGrade] = useState("1학년");
   const [tempClass, setTempClass] = useState("1반");
 
-  // 반/전담 목록 관리 (로컬스토리지 연동)
   const [classList, setClassList] = useState(() => {
     try { return JSON.parse(localStorage.getItem("sp_class_list")) || INITIAL_CLASSES; } catch { return INITIAL_CLASSES; }
   });
@@ -450,6 +450,7 @@ function App() {
     return () => clearInterval(timer);
   }, [supabase, fetchAllData]);
 
+  // 학년 공통일 경우 classNum과 무관하게 해당 학년 전체에 1개만 깔끔하게 표시되도록 필터링 개선
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (e.grade !== selectedGrade) return false;
@@ -462,7 +463,11 @@ function App() {
     const map = {};
     filteredEvents.forEach((e) => {
       if (!map[e.date]) map[e.date] = [];
-      map[e.date].push(e);
+      // 중복 방지를 위해 동일한 내용/날짜/카테고리인 경우 1개만 담기
+      const isDuplicate = map[e.date].some(item => item.content === e.content && item.category === e.category && item.date === e.date);
+      if (!isDuplicate) {
+        map[e.date].push(e);
+      }
     });
     return map;
   }, [filteredEvents]);
@@ -678,21 +683,22 @@ function App() {
       const eventPassword = form.password.trim() || currentClassPassword;
       
       if (finalCategory === "학년 공통") {
-        const newEvents = classList.map((clsNum, idx) => ({
-          id: Math.floor(Date.now() % 2147483647) + idx,
+        // 학년 공통은 해당 학년 전체에 1개의 데이터만 등록되도록 수정
+        const newEv = {
+          id: Math.floor(Date.now() % 2147483647),
           date: form.date,
           grade: selectedGrade,
-          classNum: clsNum,
+          classNum: "ALL",
           category: "학년 공통",
           content: form.content,
           manager: form.manager,
           password: eventPassword
-        }));
+        };
 
         if (supabase) {
-          await supabase.from('events').insert(newEvents);
+          await supabase.from('events').insert([newEv]);
         }
-        setEvents(prev => [...prev, ...newEvents]);
+        setEvents(prev => [...prev, newEv]);
       } else {
         const newEv = {
           id: Math.floor(Date.now() % 2147483647),
