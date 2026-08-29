@@ -1148,7 +1148,7 @@ function App() {
               </div>
               <div>
                 <FieldLabel>담당자 (선택)</FieldLabel>
-                <input type="text" value={form.manager} onChange={(e) => sm = e.target.value} className={inputCls} placeholder="예) 홍길동" value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} />
+                <input type="text" value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} className={inputCls} placeholder="예) 홍길동" />
               </div>
               {eventModal.mode === "add" ? (
                 <div>
@@ -1158,7 +1158,7 @@ function App() {
               ) : (
                 <div>
                   <FieldLabel>비밀번호</FieldLabel>
-                  <input type="password" value={pwCheckInput} onChange={(e) => setPwCheckInput(e.target.value)} className={inputCls} placeholder="비밀번호 입력" />
+                  <input type="password" value= {pwCheckInput} onChange={(e) => setPwCheckInput(e.target.value)} className={inputCls} placeholder="비밀번호 입력" />
                 </div>
               )}
               {pwCheckError && <p className="text-xs font-semibold text-rose-500">{pwCheckError}</p>}
