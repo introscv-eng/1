@@ -398,7 +398,7 @@ function App() {
   const [newPwInput, setNewPwInput] = useState("");
 
   const currentClassPassword = selectedClass
-    ? (classPasswords[`${selectedGrade}_${selectedClass}`] || "1234") : "1234";
+    ? (classPasswords[`${selectedGrade}_${selectedClass}`] || "admin1234") : "admin1234";
 
   const handleGradeClick = (g) => {
     setSelectedGrade(g);
@@ -601,7 +601,6 @@ function App() {
   }, [supabase, currentSchool]);
 
   useEffect(() => {
-    // 로컬 스토리지 선적재 복원
     if (currentSchool) {
       try {
         const h = localStorage.getItem(`sp_holidays_${currentSchool}`); if (h) setCustomHolidays(JSON.parse(h));
@@ -710,7 +709,6 @@ function App() {
   };
 
   const handleChangeClassPw = async () => {
-    // 일반 모드일 경우 반드시 본인의 현재 선택된 학년/학급만 변경 가능
     if (!isAdminMode) {
       if (selectedPwGrade !== selectedGrade || selectedPwClass !== selectedClass) {
         alert("일반 모드에서는 본인이 접속 중인 학급의 비밀번호만 변경할 수 있습니다.");
@@ -746,7 +744,7 @@ function App() {
       return;
     }
     const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
-    const updated = { ...classPasswords, [targetKey]: "1234" };
+    const updated = { ...classPasswords, [targetKey]: masterPassword };
     setClassPasswords(updated);
     localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(updated));
     if (supabase) {
@@ -754,7 +752,7 @@ function App() {
     }
     setCustomNewPwInput("");
     setCustomNewPwConfirm("");
-    alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 기본값 '1234'로 초기화되었습니다.`);
+    alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 마스터 비밀번호로 초기화되었습니다.`);
   };
 
   const handleSaveMasterPassword = async () => {
@@ -825,9 +823,9 @@ function App() {
   const confirmSchoolAuth = () => {
     if (!pendingSchoolChange) return;
     const { office, school } = pendingSchoolChange;
-    // 해당 학교의 마스터 혹은 공용 비밀번호 검증 (기본값 admin1234 혹은 설정된 masterPassword)
-    if (schoolAuthPwInput !== masterPassword && schoolAuthPwInput !== "1234") {
-      alert("비밀번호가 일치하지 않습니다. 틀렸습니다.");
+    // 오직 마스터 비밀번호로만 검증
+    if (schoolAuthPwInput !== masterPassword) {
+      alert("관리자 비밀번호가 일치하지 않습니다. 틀렸습니다.");
       return;
     }
     setCurrentOffice(office);
@@ -1269,7 +1267,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
             <div className="min-w-0 flex-1">
               <h1 className="text-xl font-extrabold text-slate-900 sm:text-2xl whitespace-nowrap overflow-hidden text-ellipsis mb-1">
-                 [{selectedGrade} {selectedClass ? selectedClass : "공통"}] 학급·전담 행사 일정 관리
+                [{selectedGrade} {selectedClass ? selectedClass : "공통"}] 학급·전담 행사 일정 관리
               </h1>
               <p className="text-xs text-slate-400">
                 {selectedClass ? "학급 전용 일정 페이지입니다." : "학년 공통 뷰입니다. 해당 학급 버튼을 눌러 개별 반으로 이동하세요."}
@@ -1557,9 +1555,9 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
         {schoolAuthModalOpen && (
           <Modal title={`[${pendingSchoolChange?.school}] 접속 인증`} onClose={() => setSchoolAuthModalOpen(false)}>
             <p className="mb-3 text-xs text-slate-500 leading-relaxed">
-              해당 학교 플래너에 접속하려면 학교(마스터) 비밀번호를 입력해주세요.
+              해당 학교 플래너에 접속하려면 관리자 비밀번호를 입력해주세요.
             </p>
-            <FieldLabel>비밀번호 (초기값: admin1234 또는 1234)</FieldLabel>
+            <FieldLabel>관리자 비밀번호</FieldLabel>
             <input
               type="password"
               autoFocus
@@ -1981,9 +1979,9 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                       type="button"
                       onClick={handleAdminResetClassPw}
                       className="rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
-                      title="기본값 '1234'로 초기화"
+                      title="마스터 비밀번호로 초기화"
                     >
-                      기본값(1234) 초기화
+                      마스터 초기화
                     </button>
                   )}
                 </div>
@@ -2030,7 +2028,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
         {/* 관리자 모드 인증 모달 */}
         {adminAuthModalOpen && (
           <Modal title="마스터 관리자 인증" onClose={() => setAdminAuthModalOpen(false)}>
-            <FieldLabel>마스터 비밀번호 (초기값: admin1234)</FieldLabel>
+            <FieldLabel>마스터 비밀번호</FieldLabel>
             <input
               type="password"
               autoFocus
