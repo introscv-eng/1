@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>학급 및 전담 행사 관리 플래너</title>
+<title>인천광역시 초등 학급 및 전담 행사 플래너</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -41,6 +41,74 @@ const FIXED_HOLIDAYS = {
   "2027-05-13": "부처님오신날", "2027-08-16": "대체공휴일(광복절)",
   "2027-09-14": "추석 연휴", "2027-09-15": "추석", "2027-09-16": "추석 연휴",
   "2027-10-04": "대체공휴일(개천절)", "2027-10-11": "대체공휴일(한글날)"
+};
+
+const INCHEON_SCHOOLS = {
+  "서부교육지원청": [
+    "인천가람초등학교", "인천가석초등학교", "인천가정초등학교", "인천가좌초등학교", "인천가원초등학교",
+    "인천가현초등학교", "인천간재울초등학교", "인천건지초등학교", "인천검단초등학교", "인천검암초등학교",
+    "인천경명초등학교", "인천경서초등학교", "인천경연초등학교", "인천공촌초등학교", "인천금곡초등학교",
+    "인천능내초등학교", "인천단봉초등학교", "인천당하초등학교", "인천도담초등학교", "인천마전초등학교",
+    "인천목향초등학교", "인천발산초등학교", "인천백석초등학교", "인천봉화초등학교", "인천봉수초등학교",
+    "인천불로초등학교", "인천서곶초등학교", "인천석남초등학교", "인천석남서초등학교", "인천신검단초등학교",
+    "인천신석초등학교", "인천신현초등학교", "인천신현북초등학교", "인천심곡초등학교", "인천아라초등학교",
+    "인천아람초등학교", "인천안남초등학교", "인천양지초등학교", "인천왕길초등학교", "인천원당초등학교",
+    "인천완정초등학교", "인천은지초등학교", "인천이음초등학교", "인천창신초등학교", "인천천마초등학교",
+    "인천청라초등학교", "인천청람초등학교", "인천청일초등학교", "인천청호초등학교", "인천초은초등학교",
+    "인천한들초등학교", "인천한별초등학교", "인천해든초등학교", "인천해원초등학교"
+  ],
+  "동부교육지원청": [
+    "상인천초등학교", "인천가천초등학교", "인천간석초등학교", "인천고잔초등학교", "인천구월초등학교",
+    "인천구월서초등학교", "인천남동초등학교", "인천남촌초등학교", "인천능허대초등학교", "인천담방초등학교",
+    "인천도림초등학교", "인천동막초등학교", "인천동방초등학교", "인천동부초등학교", "인천동춘초등학교",
+    "인천만수초등학교", "인천만수북초등학교", "인천만월초등학교", "인천먼우금초등학교", "인천명선초등학교",
+    "인천문남초등학교", "인천미송초등학교", "인천박문초등학교", "인천사리울초등학교", "인천상아초등학교",
+    "인천새말초등학교", "인천새봄초등학교", "인천서면초등학교", "인천서창초등학교", "인천선학초등학교",
+    "인천석정초등학교", "인천석천초등학교", "인천성리초등학교", "인천소래초등학교", "인천송담초등학교",
+    "인천송도초등학교", "인천송명초등학교", "인천송빛초등학교", "인천송원초등학교", "인천송일초등학교",
+    "인천송천초등학교", "인천신송초등학교", "인천신신정초등학교", "인천신월초등학교", "인천약산초등학교",
+    "인천연성초등학교", "인천연송초등학교", "인천연수초등학교", "인천연화초등학교", "인천예송초등학교",
+    "인천옥련초등학교", "인천원동초등학교", "인천은봉초등학교", "인천은송초등학교", "인천인동초등학교",
+    "인천인수초등학교", "인천인송초등학교", "인천장도초등학교", "인천장서초등학교", "인천장수초등학교",
+    "인천장아초등학교", "인천정각초등학교", "인천조동초등학교", "인천주원초등학교", "인천중앙초등학교",
+    "인천첨단초등학교", "인천청량초등학교", "인천청학초등학교", "인천축현초등학교", "인천함박초등학교",
+    "인천해송초등학교", "인천현송초등학교", "한빛초등학교"
+  ],
+  "북부교육지원청": [
+    "경인교육대학교부설초등학교", "인천갈산초등학교", "인천갈월초등학교", "인천개흥초등학교", "인천계산초등학교",
+    "인천계양초등학교", "인천구산초등학교", "인천굴포초등학교", "인천귤현초등학교", "인천금마초등학교",
+    "인천길주초등학교", "인천대정초등학교", "인천동수초등학교", "인천동암초등학교", "인천마곡초등학교",
+    "인천마장초등학교", "인천명현초등학교", "인천미산초등학교", "인천백운초등학교", "인천병방초등학교",
+    "인천부개초등학교", "인천부개서초등학교", "인천부곡초등학교", "인천부광초등학교", "인천부내초등학교",
+    "인천부마초등학교", "인천부원초등학교", "인천부일초등학교", "인천부평초등학교", "인천부평남초등학교",
+    "인천부평동초등학교", "인천부평북초등학교", "인천부평서초등학교", "인천부현초등학교", "인천부현동초등학교",
+    "인천부흥초등학교", "인천산곡초등학교", "인천산곡남초등학교", "인천산곡북초등학교", "인천삼산초등학교",
+    "인천상정초등학교", "인천서운초등학교", "인천성지초등학교", "인천소양초등학교", "인천신대초등학교",
+    "인천신촌초등학교", "인천십정초등학교", "인천안남초등학교", "인천안산초등학교", "인천양촌초등학교",
+    "인천영선초등학교", "인천용마초등학교", "인천일신초등학교", "인천작동초등학교", "인천작전초등학교",
+    "인천진산초등학교", "인천청천초등학교", "인천하정초등학교", "인천한길초등학교", "인천해서초등학교",
+    "인천후정초등학교", "인천화전초등학교", "인천효성초등학교", "인천효성동초등학교", "인천효성서초등학교",
+    "인천효성남초등학교", "한일초등학교"
+  ],
+  "남부교육지원청": [
+    "영화초등학교", "인성초등학교", "인천공항초등학교", "인천관교초등학교", "인천경원초등학교",
+    "인천달빛초등학교", "인천대화초등학교", "인천도원초등학교", "인천도화초등학교", "인천동명초등학교",
+    "인천만석초등학교", "인천문학초등학교", "인천백령초등학교", "인천백학초등학교", "인천별빛초등학교",
+    "인천사동초등학교", "인천서림초등학교", "인천서화초등학교", "인천서흥초등학교", "인천송림초등학교",
+    "인천송월초등학교", "인천송현초등학교", "인천숭의초등학교", "인천승학초등학교", "인천신광초등학교",
+    "인천신선초등학교", "인천신창초등학교", "인천신흥초등학교", "인천안일초등학교", "인천연안초등학교",
+    "인천연학초등학교", "인천영종초등학교", "인천용일초등학교", "인천용정초등학교", "인천용학초등학교",
+    "인천용현초등학교", "인천용현남초등학교", "인천운남초등학교", "인천운서초등학교", "인천윤슬초등학교",
+    "인천월미초등학교", "인천인주초등학교", "인천임학초등학교", "인천장도초등학교", "인천전동초등학교",
+    "인천주안초등학교", "인천주안남초등학교", "인천주안북초등학교", "인천중산초등학교", "인천창영초등학교",
+    "인천하늘초등학교", "인천학산초등학교", "인천학익초등학교", "대청초등학교", "덕적초등학교", "북포초등학교", "연평초등학교", "영흥초등학교"
+  ],
+  "강화교육지원청": [
+    "강화초등학교", "갑룡초등학교", "길상초등학교", "난정초등학교", "내가초등학교",
+    "대송초등학교", "명신초등학교", "불은초등학교", "삼산초등학교", "선원초등학교",
+    "송해초등학교", "양도초등학교", "양사초등학교", "조산초등학교", "하점초등학교",
+    "화도초등학교"
+  ]
 };
 
 const INITIAL_GRADES = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
@@ -103,9 +171,11 @@ function Modal({ title, onClose, children, wide = false }) {
       <div className={`w-full ${wide ? "max-w-2xl" : "max-w-sm"} rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 relative my-8`}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-800">{title}</h3>
-          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-            <XIcon size={18} />
-          </button>
+          {onClose && (
+            <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <XIcon size={18} />
+            </button>
+          )}
         </div>
         {children}
       </div>
@@ -151,6 +221,9 @@ const SettingsIcon = ({ size = 15, className = "" }) => (
 );
 const ShieldAlertIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+);
+const SchoolIcon = ({ size = 15, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 22v-4a2 2 0 1 0-4 0v4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M18 5v17"/><path d="m4 6 8-4 8 4"/><path d="M6 5v17"/><circle cx="12" cy="9" r="2"/></svg>
 );
 const UploadCloudIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
@@ -252,29 +325,39 @@ function App() {
   const [viewDate, setViewDate] = useState(new Date());
   const [weekAnchor, setWeekAnchor] = useState(new Date());
 
+  // 학교별 격리 선택 상태 (최초 접속 시 또는 [학교 변경] 시 선택 모달 오픈)
+  const savedSchool = localStorage.getItem("sp_school");
+  const [currentOffice, setCurrentOffice] = useState(() => localStorage.getItem("sp_office") || "서부교육지원청");
+  const [currentSchool, setCurrentSchool] = useState(() => savedSchool || "");
+  const [schoolModalOpen, setSchoolModalOpen] = useState(!savedSchool);
+
+  const [tempOffice, setTempOffice] = useState(currentOffice);
+  const [tempSchool, setTempSchool] = useState(currentSchool || "인천경연초등학교");
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState("");
+
   const [gradesList, setGradesList] = useState(() => {
     try {
-      const saved = localStorage.getItem("sp_grade_list");
+      const saved = localStorage.getItem(`sp_grade_list_${currentSchool}`);
       if (saved) return JSON.parse(saved);
     } catch(e) {}
     return INITIAL_GRADES;
   });
   const [newGradeInput, setNewGradeInput] = useState("");
 
-  const [selectedGrade, setSelectedGrade] = useState(() => localStorage.getItem("sp_last_grade") || (gradesList[0] || "1학년"));
-  const [selectedClass, setSelectedClass] = useState(() => localStorage.getItem("sp_last_class") || null);
+  const [selectedGrade, setSelectedGrade] = useState(() => localStorage.getItem(`sp_last_grade_${currentSchool}`) || (gradesList[0] || "1학년"));
+  const [selectedClass, setSelectedClass] = useState(() => localStorage.getItem(`sp_last_class_${currentSchool}`) || null);
 
   const [todayPosition, setTodayPosition] = useState(() => localStorage.getItem("sp_today_pos") || "header");
 
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [masterPassword, setMasterPassword] = useState(() => localStorage.getItem("sp_master_password") || "admin1234");
+  const [masterPassword, setMasterPassword] = useState(() => localStorage.getItem(`sp_master_pw_${currentSchool}`) || "admin1234");
   const [adminAuthModalOpen, setAdminAuthModalOpen] = useState(false);
   const [adminAuthPwInput, setAdminAuthPwInput] = useState("");
   const [adminAuthError, setAdminAuthError] = useState("");
 
   const [gradeConfigs, setGradeConfigs] = useState(() => {
     try {
-      const saved = localStorage.getItem("sp_grade_configs");
+      const saved = localStorage.getItem(`sp_grade_configs_${currentSchool}`);
       if (saved) return JSON.parse(saved);
     } catch(e) {}
     const init = {};
@@ -302,7 +385,7 @@ function App() {
   }, [selectedGrade, gradeConfigs]);
 
   const [classPasswords, setClassPasswords] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("sp_class_passwords")) || {}; } catch { return {}; }
+    try { return JSON.parse(localStorage.getItem(`sp_class_pw_${currentSchool}`)) || {}; } catch { return {}; }
   });
 
   const [targetSwitch, setTargetSwitch] = useState(null);
@@ -317,8 +400,8 @@ function App() {
   const handleGradeClick = (g) => {
     setSelectedGrade(g);
     setSelectedClass(null);
-    localStorage.setItem("sp_last_grade", g);
-    localStorage.removeItem("sp_last_class");
+    localStorage.setItem(`sp_last_grade_${currentSchool}`, g);
+    localStorage.removeItem(`sp_last_class_${currentSchool}`);
   };
 
   const promptSwitchClass = (g, c) => {
@@ -326,8 +409,8 @@ function App() {
     if (isAdminMode) {
       setSelectedGrade(g);
       setSelectedClass(c);
-      localStorage.setItem("sp_last_grade", g);
-      localStorage.setItem("sp_last_class", c);
+      localStorage.setItem(`sp_last_grade_${currentSchool}`, g);
+      localStorage.setItem(`sp_last_class_${currentSchool}`, c);
       return;
     }
     const key = `${g}_${c}`;
@@ -352,11 +435,11 @@ function App() {
       }
       const updated = { ...classPasswords, [key]: newPwInput.trim() };
       setClassPasswords(updated);
-      localStorage.setItem("sp_class_passwords", JSON.stringify(updated));
+      localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(updated));
       setSelectedGrade(grade);
       setSelectedClass(cls);
-      localStorage.setItem("sp_last_grade", grade);
-      localStorage.setItem("sp_last_class", cls);
+      localStorage.setItem(`sp_last_grade_${currentSchool}`, grade);
+      localStorage.setItem(`sp_last_class_${currentSchool}`, cls);
       setTargetSwitch(null);
       alert(`${grade} ${cls} 비밀번호가 설정되고 전환되었습니다.`);
       return;
@@ -369,8 +452,8 @@ function App() {
 
     setSelectedGrade(grade);
     setSelectedClass(cls);
-    localStorage.setItem("sp_last_grade", grade);
-    localStorage.setItem("sp_last_class", cls);
+    localStorage.setItem(`sp_last_grade_${currentSchool}`, grade);
+    localStorage.setItem(`sp_last_class_${currentSchool}`, cls);
     setTargetSwitch(null);
   };
 
@@ -402,7 +485,7 @@ function App() {
   const [deletePwError, setDeletePwError] = useState("");
 
   const [customHolidays, setCustomHolidays] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("sp_custom_holidays")) || {}; } catch { return {}; }
+    try { return JSON.parse(localStorage.getItem(`sp_holidays_${currentSchool}`)) || {}; } catch { return {}; }
   });
   const [holidayModalOpen, setHolidayModalOpen] = useState(false);
   const [holidayCalendarDate, setHolidayCalendarDate] = useState(new Date());
@@ -410,23 +493,22 @@ function App() {
   const [holidayNameInput, setHolidayNameInput] = useState("재량휴업일");
 
   const [notices, setNotices] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("sp_notices")) || {}; } catch { return {}; }
+    try { return JSON.parse(localStorage.getItem(`sp_notices_${currentSchool}`)) || {}; } catch { return {}; }
   });
 
   const getPeriodKey = (scopeType) => {
     const period = tab === "month" ? `${viewDate.getFullYear()}-${pad2(viewDate.getMonth() + 1)}` : ymd(startOfWeekMon(weekAnchor));
     if (scopeType === "grade") {
-      return `${selectedGrade}_COMMON_${period}`;
+      return `${currentSchool}_${selectedGrade}_COMMON_${period}`;
     } else {
       const cls = selectedClass || '1반';
-      return `${selectedGrade}_${cls}_${period}`;
+      return `${currentSchool}_${selectedGrade}_${cls}_${period}`;
     }
   };
 
   const gradeNoticeKey = getPeriodKey("grade");
   const classNoticeKey = getPeriodKey("class");
 
-  // 🚨 [필수 수정] 누락되어 화면을 멈추게 했던 공지사항 변수 선언 추가
   const activeGradeNotice = notices[gradeNoticeKey] || "";
   const activeClassNotice = notices[classNoticeKey] || "";
 
@@ -465,9 +547,9 @@ function App() {
     }
     setNotices(updated);
     setNoticeModalOpen(false);
-    localStorage.setItem("sp_notices", JSON.stringify(updated));
+    localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(updated));
     if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: 'notices_class_data', data: updated }]);
+      await supabase.from('admin_status').upsert([{ week_key: `notices_${currentSchool}`, data: updated }]);
     }
     alert("공지사항이 저장되었습니다.");
   };
@@ -479,9 +561,9 @@ function App() {
     setNotices(updated);
     setModalNoticeText("");
     setNoticeModalOpen(false);
-    localStorage.setItem("sp_notices", JSON.stringify(updated));
+    localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(updated));
     if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: 'notices_class_data', data: updated }]);
+      await supabase.from('admin_status').upsert([{ week_key: `notices_${currentSchool}`, data: updated }]);
     }
     alert("공지사항이 삭제되었습니다.");
   };
@@ -510,9 +592,9 @@ function App() {
       }
     };
     setGradeConfigs(updated);
-    localStorage.setItem("sp_grade_configs", JSON.stringify(updated));
+    localStorage.setItem(`sp_grade_configs_${currentSchool}`, JSON.stringify(updated));
     if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: 'grade_configs_data', data: updated }]);
+      await supabase.from('admin_status').upsert([{ week_key: `configs_${currentSchool}`, data: updated }]);
     }
     alert(`${editingConfigGrade}의 학급 및 전담 설정이 적용되었습니다.`);
   };
@@ -541,9 +623,9 @@ function App() {
 
     const updated = { ...classPasswords, [targetKey]: newPw };
     setClassPasswords(updated);
-    localStorage.setItem("sp_class_passwords", JSON.stringify(updated));
+    localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(updated));
     if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: 'class_passwords_data', data: updated }]);
+      await supabase.from('admin_status').upsert([{ week_key: `class_pw_${currentSchool}`, data: updated }]);
     }
     setCustomNewPwInput("");
     setCustomNewPwConfirm("");
@@ -558,9 +640,9 @@ function App() {
     const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
     const updated = { ...classPasswords, [targetKey]: "1234" };
     setClassPasswords(updated);
-    localStorage.setItem("sp_class_passwords", JSON.stringify(updated));
+    localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(updated));
     if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: 'class_passwords_data', data: updated }]);
+      await supabase.from('admin_status').upsert([{ week_key: `class_pw_${currentSchool}`, data: updated }]);
     }
     setCustomNewPwInput("");
     setCustomNewPwConfirm("");
@@ -578,9 +660,9 @@ function App() {
       return;
     }
     setMasterPassword(trimmed);
-    localStorage.setItem("sp_master_password", trimmed);
+    localStorage.setItem(`sp_master_pw_${currentSchool}`, trimmed);
     if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: 'master_password_data', data: { password: trimmed } }]);
+      await supabase.from('admin_status').upsert([{ week_key: `master_pw_${currentSchool}`, data: { password: trimmed } }]);
     }
     alert(`마스터 관리자 비밀번호가 성공적으로 변경되었습니다.`);
   };
@@ -761,6 +843,7 @@ function App() {
 
             parsed.push({
               id: Math.floor(Date.now() + Math.random() * 1000000 + i) % 2147483647,
+              school_name: currentSchool,
               date: cols[0].replace(/[./]/g, '-'),
               grade: formattedGrade,
               dept: classInfo.dept,
@@ -800,6 +883,7 @@ function App() {
 
           parsed.push({
             id: Math.floor(Date.now() + Math.random() * 1000000 + i) % 2147483647,
+            school_name: currentSchool,
             date: cols[0].replace(/[./]/g, '-'),
             grade: formattedGrade,
             dept: classInfo.dept,
@@ -843,60 +927,34 @@ function App() {
     alert(`총 ${csvParsedData.length}건의 일정이 성공적으로 일괄 등록되었습니다!`);
   };
 
-  const defaultScheduleRow = (dateStr) => ({
-    date: dateStr || ymd(today),
-    targetType: "all",
-    selectedTargets: [...activeClassList]
-  });
-
-  const emptyForm = { 
-    targetGrade: selectedGrade,
-    category: selectedClass ? "학습" : "학년 공통", 
-    content: "", 
-    manager: "", 
-    password: "",
-    schedules: [defaultScheduleRow(ymd(today))],
-    repeatType: "none",
-    repeatEndDate: ymd(addMonths(today, 1)),
-    repeatCycles: []
-  };
-
-  const [eventModal, setEventModal] = useState(null);
-  const [form, setForm] = useState(emptyForm);
-  const [pwCheckInput, setPwCheckInput] = useState("");
-  const [pwCheckError, setPwCheckError] = useState("");
-
   const fetchAllData = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || !currentSchool) return;
     try {
-      const { data: dbEvents } = await supabase.from('events').select('*');
+      const { data: dbEvents } = await supabase.from('events').select('*').eq('school_name', currentSchool);
       if (dbEvents) setEvents(dbEvents);
     } catch(e) {}
     try {
       const { data: dbAdmin } = await supabase.from('admin_status').select('*');
       if (dbAdmin) {
         dbAdmin.forEach(item => {
-          if (item.week_key === 'custom_holidays_data') {
+          if (item.week_key === `holidays_${currentSchool}`) {
             setCustomHolidays(item.data || {});
-            localStorage.setItem("sp_custom_holidays", JSON.stringify(item.data || {}));
-          } else if (item.week_key === 'notices_class_data') {
+            localStorage.setItem(`sp_holidays_${currentSchool}`, JSON.stringify(item.data || {}));
+          } else if (item.week_key === `notices_${currentSchool}`) {
             setNotices(item.data || {});
-            localStorage.setItem("sp_notices", JSON.stringify(item.data || {}));
-          } else if (item.week_key === 'class_passwords_data') {
-            setClassPasswords(item.data || {});
-            localStorage.setItem("sp_class_passwords", JSON.stringify(item.data || {}));
-          } else if (item.week_key === 'grade_configs_data') {
+            localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(item.data || {}));
+          } else if (item.week_key === `configs_${currentSchool}`) {
             setGradeConfigs(item.data || {});
-            localStorage.setItem("sp_grade_configs", JSON.stringify(item.data || {}));
-          } else if (item.week_key === 'grade_list_data') {
-            if (Array.isArray(item.data) && item.data.length > 0) {
+            localStorage.setItem(`sp_grade_configs_${currentSchool}`, JSON.stringify(item.data || {}));
+          } else if (item.week_key === `grades_${currentSchool}`) {
+            if (Array.isArray(item.data)) {
               setGradesList(item.data);
-              localStorage.setItem("sp_grade_list", JSON.stringify(item.data));
+              localStorage.setItem(`sp_grade_list_${currentSchool}`, JSON.stringify(item.data));
             }
-          } else if (item.week_key === 'master_password_data') {
+          } else if (item.week_key === `master_pw_${currentSchool}`) {
             if (item.data && item.data.password) {
               setMasterPassword(item.data.password);
-              localStorage.setItem("sp_master_password", item.data.password);
+              localStorage.setItem(`sp_master_pw_${currentSchool}`, item.data.password);
             }
           } else if (item.week_key === 'today_pos_setting') {
             if (item.data && item.data.pos) {
@@ -907,7 +965,7 @@ function App() {
         });
       }
     } catch(e) {}
-  }, [supabase]);
+  }, [supabase, currentSchool]);
 
   useEffect(() => {
     fetchAllData();
@@ -915,6 +973,15 @@ function App() {
     const timer = setInterval(fetchAllData, 5000);
     return () => clearInterval(timer);
   }, [supabase, fetchAllData]);
+
+  const handleApplySchoolChange = (newOffice, newSch) => {
+    setCurrentOffice(newOffice);
+    setCurrentSchool(newSch);
+    localStorage.setItem("sp_office", newOffice);
+    localStorage.setItem("sp_school", newSch);
+    setSchoolModalOpen(false);
+    window.location.reload();
+  };
 
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
@@ -989,7 +1056,6 @@ function App() {
       setDeletePwError("비밀번호가 일치하지 않습니다.");
       return;
     }
-
     const idsArr = Array.from(selectedEventIds);
     if (supabase) {
       await supabase.from('events').delete().in('id', idsArr);
@@ -1000,7 +1066,6 @@ function App() {
     alert("선택한 일정이 안전하게 삭제되었습니다.");
   };
 
-  // 💡 [지적사항 반영 완료] 하루에 여러 행사가 있을 때 각각 개별 행(<tr>)으로 출력되도록 수정된 handlePrint
   const handlePrint = () => {
     const isMonth = tab === "month";
     const activeDays = isMonth ? monthDays : weekDates;
@@ -1032,7 +1097,7 @@ function App() {
       </head>
       <body>
         <table>
-          <tr><td colspan="4" class="title">${selectedGrade} ${selectedClass || '전체 공통'} ${isMonth ? `${monthLabel} 행사 일정표` : `주간 행사 계획 (${weekLabel})`}</td></tr>
+          <tr><td colspan="4" class="title">[${currentSchool}] ${selectedGrade} ${selectedClass || '전체 공통'} ${isMonth ? `${monthLabel} 행사 일정표` : `주간 행사 계획 (${weekLabel})`}</td></tr>
           <tr>
             <th style="width: 50px;">일자</th>
             <th style="width: 50px;">요일</th>
@@ -1096,7 +1161,7 @@ function App() {
     const blob = new Blob(["\uFEFF" + htmlTableContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `${selectedGrade}_${selectedClass || '공통'}_학급행사관리.xls`);
+    link.setAttribute("download", `${currentSchool}_${selectedGrade}_${selectedClass || '공통'}_행사관리.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1238,6 +1303,7 @@ function App() {
 
           newEvents.push({
             id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
+            school_name: currentSchool,
             date: targetDateStr,
             grade: targetGrade,
             dept: isGradeCommon ? "학년 공통" : defaultTargetDept,
@@ -1295,6 +1361,27 @@ function App() {
     setEventModal(null);
   };
 
+  const defaultScheduleRowForForm = (dateStr) => ({
+    date: dateStr || ymd(today),
+    targetType: "all",
+    selectedTargets: [...activeClassList]
+  });
+
+  const emptyForm = { 
+    targetGrade: selectedGrade,
+    category: selectedClass ? "학습" : "학년 공통", 
+    content: "", 
+    manager: "", 
+    password: "",
+    schedules: [defaultScheduleRowForForm(ymd(today))],
+    repeatType: "none",
+    repeatEndDate: ymd(addMonths(today, 1)),
+    repeatCycles: []
+  };
+
+  const [eventModal, setEventModal] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-violet-50 via-white to-white p-4 pb-32 sm:p-6 sm:pb-36">
       <div className="mx-auto max-w-3xl">
@@ -1318,6 +1405,21 @@ function App() {
             <button onClick={() => setCopiedEvent(null)} className="ml-2 shrink-0 rounded-lg bg-violet-700 px-2 py-0.5 text-xs hover:bg-violet-800">해제</button>
           </div>
         )}
+
+        {/* 상단 학교 선택 바 */}
+        <div className="mb-3 flex items-center justify-between rounded-xl bg-violet-900 px-4 py-2.5 text-white shadow-md">
+          <div className="flex items-center gap-2 text-xs font-bold truncate">
+            <SchoolIcon size={16} className="text-violet-300 shrink-0" />
+            <span className="text-violet-300 font-semibold">{currentOffice}</span>
+            <span className="text-sm font-black text-white truncate">{currentSchool || "학교를 선택해주세요"}</span>
+          </div>
+          <button
+            onClick={() => { setTempOffice(currentOffice); setTempSchool(currentSchool || "인천경연초등학교"); setSchoolSearchQuery(""); setSchoolModalOpen(true); }}
+            className="shrink-0 rounded-lg bg-violet-700 hover:bg-violet-600 px-3 py-1 text-xs font-bold text-white transition shadow-2xs"
+          >
+            학교 변경
+          </button>
+        </div>
 
         {/* 메인 헤더 패널 */}
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
@@ -1517,6 +1619,76 @@ function App() {
             );
           })}
         </div>
+
+        {/* 학교 변경 모달 (최초 접속 시 또는 [학교 변경] 시) */}
+        {schoolModalOpen && (
+          <Modal title="소속 초등학교 선택 (최초 1회 설정)" onClose={currentSchool ? () => setSchoolModalOpen(false) : null} wide>
+            <div className="space-y-4">
+              <div className="rounded-xl bg-violet-50 p-3 text-xs text-violet-800 font-semibold">
+                ✨ 최초 1회 소속 학교를 선택하시면, 다음 접속부터는 이 학교 화면으로 자동 시작됩니다.
+              </div>
+              <div>
+                <FieldLabel>1. 관할 교육지원청 선택</FieldLabel>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                  {Object.keys(INCHEON_SCHOOLS).map(off => (
+                    <button
+                      key={off}
+                      type="button"
+                      onClick={() => { setTempOffice(off); setTempSchool(INCHEON_SCHOOLS[off][0]); }}
+                      className={`rounded-xl py-2 px-1 text-xs font-bold transition border ${tempOffice === off ? "bg-violet-600 text-white border-violet-600 shadow-xs" : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+                    >
+                      {off.replace("교육지원청", "")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <FieldLabel>2. 소속 초등학교 선택</FieldLabel>
+                <input
+                  type="text"
+                  value={schoolSearchQuery}
+                  onChange={(e) => setSchoolSearchQuery(e.target.value)}
+                  placeholder="학교 이름 검색 (예: 경연, 송빛)"
+                  className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 outline-none focus:bg-white focus:border-violet-400"
+                />
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-56 overflow-y-auto p-1 border border-slate-100 rounded-xl bg-slate-50/50">
+                  {(INCHEON_SCHOOLS[tempOffice] || [])
+                    .filter(s => s.includes(schoolSearchQuery))
+                    .map(sch => (
+                      <button
+                        key={sch}
+                        type="button"
+                        onClick={() => setTempSchool(sch)}
+                        className={`rounded-lg p-2 text-xs font-bold text-left truncate transition border ${tempSchool === sch ? "bg-violet-600 text-white border-violet-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-violet-50"}`}
+                      >
+                        {sch}
+                      </button>
+                    ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                {currentSchool && (
+                  <button
+                    type="button"
+                    onClick={() => setSchoolModalOpen(false)}
+                    className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50"
+                  >
+                    취소
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleApplySchoolChange(tempOffice, tempSchool)}
+                  className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 shadow-md"
+                >
+                  [{tempSchool}] 시작하기
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
 
         {/* CSV 일괄 업로드 모달 */}
         {csvModalOpen && (
