@@ -22,8 +22,7 @@ body { font-family: 'Inter', sans-serif; }
 <div id="root"></div>
 
 <script type="text/babel">
-const RAW_SUPABASE_URL = "https://tygsgurwjpojjzzrtyhrq.supabase.co/rest/v1/";
-const SUPABASE_URL = RAW_SUPABASE_URL.replace(/\/rest\/v1\/?$/, "");
+const SUPABASE_URL = "https://tygsgurwjpojjzzrtyhrq.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzIyMzI2OH0.VR63l1j_PMhetS3pY3RsIT6G3sFFZZlZNjEg39dtn6s";
 
 const { useState, useMemo, useEffect, useCallback, useRef } = React;
@@ -464,7 +463,6 @@ function App() {
     return () => clearInterval(timer);
   }, [supabase, fetchAllData]);
 
-  // 기존 DB 구조(dept 칼럼)에 맞춰 학년 공통 및 개별 학급 필터링
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (e.grade !== selectedGrade) return false;
