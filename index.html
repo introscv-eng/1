@@ -350,10 +350,9 @@ function App() {
   const [tempSchool, setTempSchool] = useState(currentSchool || "인천경연초등학교");
   const [schoolSearchQuery, setSchoolSearchQuery] = useState("");
   
-  // 학교 변경/시작 시 비밀번호 확인 모달 상태
   const [schoolAuthModalOpen, setSchoolAuthModalOpen] = useState(false);
   const [schoolAuthPwInput, setSchoolAuthPwInput] = useState("");
-  const [pendingSchoolChange, setPendingSchoolChange] = useState(null); // {office, school}
+  const [pendingSchoolChange, setPendingSchoolChange] = useState(null);
 
   const [masterPassword, setMasterPassword] = useState("admin1234");
   const [classPasswords, setClassPasswords] = useState({});
@@ -386,6 +385,7 @@ function App() {
   const [customNewPwInput, setCustomNewPwInput] = useState("");
   const [customNewPwConfirm, setCustomNewPwConfirm] = useState("");
   const [editingMasterPwInput, setEditingMasterPwInput] = useState("");
+  const [editingMasterPwConfirm, setEditingMasterPwConfirm] = useState(""); // 추가된 마스터 비밀번호 확인 상태
 
   const activeClassList = useMemo(() => {
     const cfg = gradeConfigs[selectedGrade] || DEFAULT_CLASS_CONFIG;
@@ -763,16 +763,24 @@ function App() {
       return;
     }
     const trimmed = editingMasterPwInput.trim();
+    const confirmTrimmed = editingMasterPwConfirm.trim();
+
     if (!trimmed) {
-      alert("마스터 비밀번호를 입력해주세요.");
+      alert("새 마스터 비밀번호를 입력해주세요.");
       return;
     }
+    if (trimmed !== confirmTrimmed) {
+      alert("새 마스터 비밀번호와 확인란의 입력값이 일치하지 않습니다. 다시 확인해주세요.");
+      return;
+    }
+
     setMasterPassword(trimmed);
     localStorage.setItem(`sp_master_pw_${currentSchool}`, trimmed);
     if (supabase) {
       await supabase.from('admin_status').upsert([{ week_key: `master_pw_${currentSchool}`, data: { password: trimmed } }]);
     }
     setEditingMasterPwInput("");
+    setEditingMasterPwConfirm("");
     alert('마스터 관리자 비밀번호가 성공적으로 변경되었습니다.');
   };
 
@@ -1992,21 +2000,30 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
               <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2">
                 <FieldLabel>마스터 관리자 비밀번호 변경</FieldLabel>
                 {isAdminMode ? (
-                  <div className="flex gap-2">
+                  <div className="space-y-2">
                     <input
                       type="password"
                       value={editingMasterPwInput}
                       onChange={(e) => setEditingMasterPwInput(e.target.value)}
                       placeholder="새 마스터 비밀번호 입력"
-                      className="flex-1 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs outline-none"
+                      className="w-full rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs outline-none"
                     />
-                    <button
-                      type="button"
-                      onClick={handleSaveMasterPassword}
-                      className="rounded-xl bg-amber-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shrink-0"
-                    >
-                      마스터 비번 변경
-                    </button>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={editingMasterPwConfirm}
+                        onChange={(e) => setEditingMasterPwConfirm(e.target.value)}
+                        placeholder="새 마스터 비밀번호 확인"
+                        className="flex-1 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveMasterPassword}
+                        className="rounded-xl bg-amber-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shrink-0"
+                      >
+                        마스터 비번 변경
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-xs text-amber-800 bg-amber-100 p-2 rounded-lg">
