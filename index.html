@@ -262,7 +262,8 @@ function App() {
   const [weekAnchor, setWeekAnchor] = useState(new Date());
 
   const [selectedGrade, setSelectedGrade] = useState(() => localStorage.getItem("sp_last_grade") || "1학년");
-  const [selectedClass, setSelectedClass] = useState(() => localStorage.getItem("sp_last_class") || "1반");
+  // 선택된 학급이 없을 수 있도록 null 허용
+  const [selectedClass, setSelectedClass] = useState(() => localStorage.getItem("sp_last_class") || null);
 
   // 마스터 관리자 모드 상태
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -312,23 +313,15 @@ function App() {
   const [isSettingNewPw, setIsSettingNewPw] = useState(false);
   const [newPwInput, setNewPwInput] = useState("");
 
-  const currentClassKey = `${selectedGrade}_${selectedClass}`;
-  const currentClassPassword = classPasswords[currentClassKey] || "1234";
+  const currentClassKey = `${selectedGrade}_${selectedClass || '전체'}`;
+  const currentClassPassword = selectedClass ? (classPasswords[`${selectedGrade}_${selectedClass}`] || "1234") : "1234";
 
-  // 학년 버튼 클릭 시 전환 처리
+  // 학년 버튼 클릭 시: 학급 선택을 초기화(null)하여 강제 1반 진입 방지
   const handleGradeClick = (g) => {
-    if (g === selectedGrade) return;
-    const cfg = gradeConfigs[g] || DEFAULT_CLASS_CONFIG;
-    const defaultCls = cfg.classCount > 0 ? "1반" : (cfg.specialists[0] || "1반");
-    
-    if (isAdminMode) {
-      setSelectedGrade(g);
-      setSelectedClass(defaultCls);
-      localStorage.setItem("sp_last_grade", g);
-      localStorage.setItem("sp_last_class", defaultCls);
-    } else {
-      promptSwitchClass(g, defaultCls);
-    }
+    setSelectedGrade(g);
+    setSelectedClass(null);
+    localStorage.setItem("sp_last_grade", g);
+    localStorage.removeItem("sp_last_class");
   };
 
   // 학급/전담 클릭 시 전환 처리
@@ -514,7 +507,6 @@ function App() {
     alert(`${editingConfigGrade}의 학급 및 전담 설정이 적용되었습니다.`);
   };
 
-  // 특정 학급 비밀번호 초기화 또는 변경
   const handleResetOrChangeClassPw = async (isReset = false) => {
     const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
     const newPw = isReset ? "1234" : customNewPwInput.trim();
@@ -532,7 +524,6 @@ function App() {
     alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 '${newPw}'(으)로 ${isReset ? '초기화' : '변경'}되었습니다.`);
   };
 
-  // 마스터 관리자 비밀번호 변경
   const handleSaveMasterPassword = async () => {
     const trimmed = editingMasterPwInput.trim();
     if (!trimmed) {
@@ -556,7 +547,7 @@ function App() {
   });
 
   const emptyForm = { 
-    targetGrade: selectedGrade, // 관리자 모드용 학년 선택
+    targetGrade: selectedGrade,
     category: "학년 공통", 
     content: "", 
     manager: "", 
@@ -612,15 +603,17 @@ function App() {
     return () => clearInterval(timer);
   }, [supabase, fetchAllData]);
 
+  // 필터링: 학급이 미선택된 경우 학년 공통 일정만 보여줌
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (e.grade !== selectedGrade) return false;
       const cat = e.dept || "학습";
       if (cat === "학년 공통") {
+        if (!selectedClass) return true;
         if (!e.manager || e.manager === "전체") return true;
         return e.manager.includes(selectedClass);
       }
-      return e.dept === selectedClass;
+      return selectedClass ? e.dept === selectedClass : false;
     });
   }, [events, selectedGrade, selectedClass]);
 
@@ -737,7 +730,7 @@ function App() {
       </head>
       <body>
         <table>
-          <tr><td colspan="4" class="title">${selectedGrade} ${selectedClass} ${isMonth ? `${monthLabel} 학급 행사 일정표` : `주간 행사 계획 (${weekLabel})`}</td></tr>
+          <tr><td colspan="4" class="title">${selectedGrade} ${selectedClass || '전체 공통'} ${isMonth ? `${monthLabel} 행사 일정표` : `주간 행사 계획 (${weekLabel})`}</td></tr>
           <tr>
             <th style="width: 50px;">일자</th>
             <th style="width: 50px;">요일</th>
@@ -797,7 +790,7 @@ function App() {
     const blob = new Blob(["\uFEFF" + htmlTableContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `${selectedGrade}_${selectedClass}_학급행사관리.xls`);
+    link.setAttribute("download", `${selectedGrade}_${selectedClass || '공통'}_학급행사관리.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -971,6 +964,7 @@ function App() {
     }
     const targetGrade = isAdminMode ? form.targetGrade : selectedGrade;
     const isGradeCommon = form.category === "학년 공통";
+    const defaultTargetDept = selectedClass || (activeClassList[0] || "1반");
     const eventPassword = form.password.trim() || currentClassPassword;
 
     if (eventModal.mode === "add") {
@@ -995,7 +989,7 @@ function App() {
             id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
             date: targetDateStr,
             grade: targetGrade,
-            dept: isGradeCommon ? "학년 공통" : selectedClass,
+            dept: isGradeCommon ? "학년 공통" : defaultTargetDept,
             content: form.content,
             manager: finalManager,
             password: eventPassword
@@ -1028,7 +1022,7 @@ function App() {
       const updatePayload = {
         date: row.date,
         grade: targetGrade,
-        dept: isGradeCommon ? "학년 공통" : selectedClass,
+        dept: isGradeCommon ? "학년 공통" : (eventModal.data.dept || defaultTargetDept),
         content: form.content,
         manager: finalManager
       };
@@ -1058,7 +1052,6 @@ function App() {
     setEventModal(null);
   };
 
-  // 선택된 비밀번호 관리 학년의 반 목록
   const pwTargetClassList = useMemo(() => {
     const cfg = gradeConfigs[selectedPwGrade] || DEFAULT_CLASS_CONFIG;
     const classes = [];
@@ -1069,12 +1062,11 @@ function App() {
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-violet-50 via-white to-white p-4 pb-32 sm:p-6 sm:pb-36">
       <div className="mx-auto max-w-3xl">
-        {/* 관리자 모드 활성화 배너 */}
         {isAdminMode && (
           <div className="mb-4 flex items-center justify-between rounded-2xl bg-amber-500 px-4 py-2.5 text-white shadow-lg shadow-amber-200">
             <div className="flex items-center gap-2 text-xs font-bold truncate">
               <span className="rounded-lg bg-amber-700 px-2 py-0.5 shrink-0">MASTER ADMIN ON</span>
-              <span className="truncate font-medium">마스터 관리자 모드 실행 중: 학년/학급 인증 없이 모든 일정을 일괄 등록 및 관리할 수 있습니다.</span>
+              <span className="truncate font-medium">마스터 관리자 모드 실행 중: 모든 학년/학급 일정을 비밀번호 없이 일괄 등록·관리할 수 있습니다.</span>
             </div>
             <button onClick={handleToggleAdminMode} className="ml-2 shrink-0 rounded-lg bg-amber-700 px-2.5 py-1 text-xs font-bold hover:bg-amber-800 transition">관리자 종료</button>
           </div>
@@ -1095,9 +1087,13 @@ function App() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
               <h1 className="text-xl font-extrabold text-slate-900 sm:text-2xl mb-1">
-                [{selectedGrade} {selectedClass}] 학급 및 전담 행사 관리 플래너
+                [{selectedGrade} {selectedClass ? selectedClass : "공통/전체"}] 학급 및 전담 행사 관리 플래너
               </h1>
-              <p className="text-xs text-slate-400">학년 또는 학급/전담 버튼을 누르면 즉시 전환됩니다.</p>
+              <p className="text-xs text-slate-400">
+                {selectedClass 
+                  ? "개별 학급 페이지입니다. 다른 반/전담 버튼을 누르면 해당 학급으로 전환됩니다."
+                  : "학년을 선택하셨습니다. 특정 반이나 전담 버튼을 눌러 입장해주세요."}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -1122,6 +1118,7 @@ function App() {
           </div>
 
           <div className="space-y-3 border-t border-slate-100 pt-3">
+            {/* 학년 선택 바 */}
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs font-bold text-slate-500 mr-2">학년:</span>
               {GRADES.map(g => (
@@ -1135,6 +1132,7 @@ function App() {
               ))}
             </div>
 
+            {/* 학급/전담 선택 바 (직접 클릭 시에만 전환 인증 창 팝업) */}
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs font-bold text-slate-500 mr-2">학급/전담:</span>
               {activeClassList.map(c => (
@@ -1179,7 +1177,7 @@ function App() {
         {/* 공지 및 협의사항 입력 공간 */}
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700">공지 및 협의사항 ({selectedGrade} {selectedClass})</span>
+            <span className="text-xs font-bold text-slate-700">공지 및 협의사항 ({selectedGrade} {selectedClass || '공통'})</span>
             <div className="flex gap-1.5">
               {!isNoticeEditing ? (
                 <button onClick={handleToggleNoticeEdit} className="rounded-lg bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700 hover:bg-violet-200 transition shadow-2xs">글쓰기/수정</button>
@@ -1343,7 +1341,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* 현재 전담 목록 배지 */}
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {cfgSpecialists.map((spec, sIdx) => (
                     <div key={sIdx} className="flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-0.5 text-xs font-bold text-violet-700 shadow-2xs">
@@ -1589,7 +1586,6 @@ function App() {
         {eventModal && (
           <Modal title={eventModal.mode === "add" ? (isAdminMode ? "👑 [관리자] 일정 일괄 등록" : "일정 일괄 추가") : "일정 수정"} onClose={() => setEventModal(null)} wide>
             <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-              {/* 관리자 모드 전용: 등록 대상 학년 선택 */}
               {isAdminMode && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5">
                   <FieldLabel>등록 대상 학년 선택 (관리자 일괄 지정)</FieldLabel>
@@ -1803,7 +1799,6 @@ function App() {
                 </div>
               )}
 
-              {/* 관리자 모드가 아닐 때만 비밀번호 표시 */}
               {!isAdminMode && (
                 <div>
                   <FieldLabel>{eventModal.mode === "add" ? "비밀번호 (수정/삭제 시 사용할 비밀번호)" : "비밀번호"}</FieldLabel>
