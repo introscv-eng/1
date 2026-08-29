@@ -246,11 +246,12 @@ function App() {
   const [viewDate, setViewDate] = useState(new Date());
   const [weekAnchor, setWeekAnchor] = useState(new Date());
 
-  const [selectedGrade, setSelectedGrade] = useState("1학년");
-  const [selectedClass, setSelectedClass] = useState("1반");
+  // 마지막 저장된 학년/반 불러오기 (기본값: 1학년 1반)
+  const [selectedGrade, setSelectedGrade] = useState(() => localStorage.getItem("sp_last_grade") || "1학년");
+  const [selectedClass, setSelectedClass] = useState(() => localStorage.getItem("sp_last_class") || "1반");
 
-  const [tempGrade, setTempGrade] = useState("1학년");
-  const [tempClass, setTempClass] = useState("1반");
+  const [tempGrade, setTempGrade] = useState(selectedGrade);
+  const [tempClass, setTempClass] = useState(selectedClass);
 
   const [classList, setClassList] = useState(() => {
     try { return JSON.parse(localStorage.getItem("sp_class_list")) || INITIAL_CLASSES; } catch { return INITIAL_CLASSES; }
@@ -310,6 +311,8 @@ function App() {
       localStorage.setItem("sp_class_passwords", JSON.stringify(updated));
       setSelectedGrade(tempGrade);
       setSelectedClass(tempClass);
+      localStorage.setItem("sp_last_grade", tempGrade);
+      localStorage.setItem("sp_last_class", tempClass);
       setSwitchModalOpen(false);
       alert(`${tempGrade} ${tempClass} 비밀번호가 설정되고 전환되었습니다.`);
       return;
@@ -322,6 +325,8 @@ function App() {
 
     setSelectedGrade(tempGrade);
     setSelectedClass(tempClass);
+    localStorage.setItem("sp_last_grade", tempGrade);
+    localStorage.setItem("sp_last_class", tempClass);
     setSwitchModalOpen(false);
   };
 
@@ -418,8 +423,8 @@ function App() {
     content: "", 
     manager: "", 
     password: "", 
-    targetType: "all", // "all": 전체반, "custom": 특정 대상 선택
-    selectedTargets: [] // 선택된 반/전담 목록
+    targetType: "all", 
+    selectedTargets: [] 
   };
   const [eventModal, setEventModal] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -458,13 +463,12 @@ function App() {
     return () => clearInterval(timer);
   }, [supabase, fetchAllData]);
 
-  // 학년 공통이거나, 현재 선택한 학급과 classNum이 일치하는 일정만 필터링
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (e.grade !== selectedGrade) return false;
       if (e.category === "학년 공통") {
-        if (!e.targetList || e.targetList.length === 0) return true; // 전체 공통
-        return e.targetList.includes(selectedClass); // 특정 대상에 포함되어 있으면 표시
+        if (!e.targetList || e.targetList.length === 0) return true;
+        return e.targetList.includes(selectedClass);
       }
       return e.classNum === selectedClass;
     });
@@ -787,8 +791,10 @@ function App() {
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
-              <h1 className="text-lg font-extrabold text-slate-800 sm:text-xl">학급 및 전담 행사 관리 플래너</h1>
-              <p className="text-xs text-slate-400">현재 보기: <span className="text-violet-600 font-bold">{selectedGrade} {selectedClass}</span></p>
+              <h1 className="text-xl font-extrabold text-slate-900 sm:text-2xl mb-1">
+                [{selectedGrade} {selectedClass}] 학급 및 전담 행사 관리 플래너
+              </h1>
+              <p className="text-xs text-slate-400">상단에서 학년과 반을 선택한 뒤 [저장 (전환하기)] 버튼을 눌러주세요.</p>
             </div>
             <div className="flex items-center gap-2">
               <button
