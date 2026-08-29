@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>인천광역시 초등 학급 및 전담 행사 관리 플래너</title>
+<title>학급 및 전담 행사 관리 플래너</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -41,74 +41,6 @@ const FIXED_HOLIDAYS = {
   "2027-05-13": "부처님오신날", "2027-08-16": "대체공휴일(광복절)",
   "2027-09-14": "추석 연휴", "2027-09-15": "추석", "2027-09-16": "추석 연휴",
   "2027-10-04": "대체공휴일(개천절)", "2027-10-11": "대체공휴일(한글날)"
-};
-
-const INCHEON_SCHOOLS = {
-  "서부교육지원청": [
-    "인천가람초등학교", "인천가석초등학교", "인천가정초등학교", "인천가좌초등학교", "인천가원초등학교",
-    "인천가현초등학교", "인천간재울초등학교", "인천건지초등학교", "인천검단초등학교", "인천검암초등학교",
-    "인천경명초등학교", "인천경서초등학교", "인천경연초등학교", "인천공촌초등학교", "인천금곡초등학교",
-    "인천능내초등학교", "인천단봉초등학교", "인천당하초등학교", "인천도담초등학교", "인천마전초등학교",
-    "인천목향초등학교", "인천발산초등학교", "인천백석초등학교", "인천봉화초등학교", "인천봉수초등학교",
-    "인천불로초등학교", "인천서곶초등학교", "인천석남초등학교", "인천석남서초등학교", "인천신검단초등학교",
-    "인천신석초등학교", "인천신현초등학교", "인천신현북초등학교", "인천심곡초등학교", "인천아라초등학교",
-    "인천아람초등학교", "인천안남초등학교", "인천양지초등학교", "인천왕길초등학교", "인천원당초등학교",
-    "인천완정초등학교", "인천은지초등학교", "인천이음초등학교", "인천창신초등학교", "인천천마초등학교",
-    "인천청라초등학교", "인천청람초등학교", "인천청일초등학교", "인천청호초등학교", "인천초은초등학교",
-    "인천한들초등학교", "인천한별초등학교", "인천해든초등학교", "인천해원초등학교"
-  ],
-  "동부교육지원청": [
-    "상인천초등학교", "인천가천초등학교", "인천간석초등학교", "인천고잔초등학교", "인천구월초등학교",
-    "인천구월서초등학교", "인천남동초등학교", "인천남촌초등학교", "인천능허대초등학교", "인천담방초등학교",
-    "인천도림초등학교", "인천동막초등학교", "인천동방초등학교", "인천동부초등학교", "인천동춘초등학교",
-    "인천만수초등학교", "인천만수북초등학교", "인천만월초등학교", "인천먼우금초등학교", "인천명선초등학교",
-    "인천문남초등학교", "인천미송초등학교", "인천박문초등학교", "인천사리울초등학교", "인천상아초등학교",
-    "인천새말초등학교", "인천새봄초등학교", "인천서면초등학교", "인천서창초등학교", "인천선학초등학교",
-    "인천석정초등학교", "인천석천초등학교", "인천성리초등학교", "인천소래초등학교", "인천송담초등학교",
-    "인천송도초등학교", "인천송명초등학교", "인천송빛초등학교", "인천송원초등학교", "인천송일초등학교",
-    "인천송천초등학교", "인천신송초등학교", "인천신신정초등학교", "인천신월초등학교", "인천약산초등학교",
-    "인천연성초등학교", "인천연송초등학교", "인천연수초등학교", "인천연화초등학교", "인천예송초등학교",
-    "인천옥련초등학교", "인천원동초등학교", "인천은봉초등학교", "인천은송초등학교", "인천인동초등학교",
-    "인천인수초등학교", "인천인송초등학교", "인천장도초등학교", "인천장서초등학교", "인천장수초등학교",
-    "인천장아초등학교", "인천정각초등학교", "인천조동초등학교", "인천주원초등학교", "인천중앙초등학교",
-    "인천첨단초등학교", "인천청량초등학교", "인천청학초등학교", "인천축현초등학교", "인천함박초등학교",
-    "인천해송초등학교", "인천현송초등학교", "한빛초등학교"
-  ],
-  "북부교육지원청": [
-    "경인교육대학교부설초등학교", "인천갈산초등학교", "인천갈월초등학교", "인천개흥초등학교", "인천계산초등학교",
-    "인천계양초등학교", "인천구산초등학교", "인천굴포초등학교", "인천귤현초등학교", "인천금마초등학교",
-    "인천길주초등학교", "인천대정초등학교", "인천동수초등학교", "인천동암초등학교", "인천마곡초등학교",
-    "인천마장초등학교", "인천명현초등학교", "인천미산초등학교", "인천백운초등학교", "인천병방초등학교",
-    "인천부개초등학교", "인천부개서초등학교", "인천부곡초등학교", "인천부광초등학교", "인천부내초등학교",
-    "인천부마초등학교", "인천부원초등학교", "인천부일초등학교", "인천부평초등학교", "인천부평남초등학교",
-    "인천부평동초등학교", "인천부평북초등학교", "인천부평서초등학교", "인천부현초등학교", "인천부현동초등학교",
-    "인천부흥초등학교", "인천산곡초등학교", "인천산곡남초등학교", "인천산곡북초등학교", "인천삼산초등학교",
-    "인천상정초등학교", "인천서운초등학교", "인천성지초등학교", "인천소양초등학교", "인천신대초등학교",
-    "인천신촌초등학교", "인천십정초등학교", "인천안남초등학교", "인천안산초등학교", "인천양촌초등학교",
-    "인천영선초등학교", "인천용마초등학교", "인천일신초등학교", "인천작동초등학교", "인천작전초등학교",
-    "인천진산초등학교", "인천청천초등학교", "인천하정초등학교", "인천한길초등학교", "인천해서초등학교",
-    "인천후정초등학교", "인천화전초등학교", "인천효성초등학교", "인천효성동초등학교", "인천효성서초등학교",
-    "인천효성남초등학교", "한일초등학교"
-  ],
-  "남부교육지원청": [
-    "영화초등학교", "인성초등학교", "인천공항초등학교", "인천관교초등학교", "인천경원초등학교",
-    "인천달빛초등학교", "인천대화초등학교", "인천도원초등학교", "인천도화초등학교", "인천동명초등학교",
-    "인천만석초등학교", "인천문학초등학교", "인천백령초등학교", "인천백학초등학교", "인천별빛초등학교",
-    "인천사동초등학교", "인천서림초등학교", "인천서화초등학교", "인천서흥초등학교", "인천송림초등학교",
-    "인천송월초등학교", "인천송현초등학교", "인천숭의초등학교", "인천승학초등학교", "인천신광초등학교",
-    "인천신선초등학교", "인천신창초등학교", "인천신흥초등학교", "인천안일초등학교", "인천연안초등학교",
-    "인천연학초등학교", "인천영종초등학교", "인천용일초등학교", "인천용정초등학교", "인천용학초등학교",
-    "인천용현초등학교", "인천용현남초등학교", "인천운남초등학교", "인천운서초등학교", "인천윤슬초등학교",
-    "인천월미초등학교", "인천인주초등학교", "인천임학초등학교", "인천장도초등학교", "인천전동초등학교",
-    "인천주안초등학교", "인천주안남초등학교", "인천주안북초등학교", "인천중산초등학교", "인천창영초등학교",
-    "인천하늘초등학교", "인천학산초등학교", "인천학익초등학교", "대청초등학교", "덕적초등학교", "북포초등학교", "연평초등학교", "영흥초등학교"
-  ],
-  "강화교육지원청": [
-    "강화초등학교", "갑룡초등학교", "길상초등학교", "난정초등학교", "내가초등학교",
-    "대송초등학교", "명신초등학교", "불은초등학교", "삼산초등학교", "선원초등학교",
-    "송해초등학교", "양도초등학교", "양사초등학교", "조산초등학교", "하점초등학교",
-    "화도초등학교"
-  ]
 };
 
 const INITIAL_GRADES = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
@@ -171,11 +103,9 @@ function Modal({ title, onClose, children, wide = false }) {
       <div className={`w-full ${wide ? "max-w-2xl" : "max-w-sm"} rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 relative my-8`}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-800">{title}</h3>
-          {onClose && (
-            <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-              <XIcon size={18} />
-            </button>
-          )}
+          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+            <XIcon size={18} />
+          </button>
         </div>
         {children}
       </div>
@@ -221,9 +151,6 @@ const SettingsIcon = ({ size = 15, className = "" }) => (
 );
 const ShieldAlertIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-);
-const SchoolIcon = ({ size = 15, className = "" }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 22v-4a2 2 0 1 0-4 0v4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M18 5v17"/><path d="m4 6 8-4 8 4"/><path d="M6 5v17"/><circle cx="12" cy="9" r="2"/></svg>
 );
 const UploadCloudIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
@@ -498,6 +425,10 @@ function App() {
 
   const gradeNoticeKey = getPeriodKey("grade");
   const classNoticeKey = getPeriodKey("class");
+
+  // 🚨 [필수 수정] 누락되어 화면을 멈추게 했던 공지사항 변수 선언 추가
+  const activeGradeNotice = notices[gradeNoticeKey] || "";
+  const activeClassNotice = notices[classNoticeKey] || "";
 
   const [noticeModalOpen, setNoticeModalOpen] = useState(false);
   const [noticeScope, setNoticeScope] = useState("grade");
@@ -1069,6 +1000,7 @@ function App() {
     alert("선택한 일정이 안전하게 삭제되었습니다.");
   };
 
+  // 💡 [지적사항 반영 완료] 하루에 여러 행사가 있을 때 각각 개별 행(<tr>)으로 출력되도록 수정된 handlePrint
   const handlePrint = () => {
     const isMonth = tab === "month";
     const activeDays = isMonth ? monthDays : weekDates;
@@ -1116,34 +1048,33 @@ function App() {
       const hol = (customHolidays && customHolidays[dStr]) || FIXED_HOLIDAYS[dStr] || FIXED_HOLIDAYS[dStr.slice(5)] || "";
       const evList = sortEvents(eventsByDate[dStr] || []);
 
-      let contentRaw = "";
-      let managerRaw = "";
-
       if (evList.length === 0) {
-        contentRaw = hol ? `[휴일] ${hol}` : "";
-        managerRaw = "";
+        htmlTableContent += `
+          <tr>
+            <td style="text-align: center;">${dayNum}</td>
+            <td style="text-align: center;">${dowStr}</td>
+            <td>${hol ? escapeToExcelCell(`[휴일] ${hol}`) : ""}</td>
+            <td style="text-align: center;">-</td>
+          </tr>
+        `;
       } else {
-        const contents = [];
-        const managers = [];
         evList.forEach(ev => {
           const badgeLabel = ev.dept || "학습";
           const isCommon = badgeLabel === "학년 공통";
           const targetStr = isCommon ? (ev.manager && ev.manager !== "전체" ? ` [${ev.manager}]` : " [전체]") : "";
-          contents.push(`[${badgeLabel}]${targetStr} ${ev.content}`);
-          managers.push(!isCommon && ev.manager ? ev.manager : "-");
-        });
-        contentRaw = contents.join("\n");
-        managerRaw = managers.join("\n");
-      }
+          const contentText = `[${badgeLabel}]${targetStr} ${ev.content}`;
+          const managerText = !isCommon && ev.manager ? ev.manager : "-";
 
-      htmlTableContent += `
-          <tr>
-            <td style="text-align: center;">${dayNum}</td>
-            <td style="text-align: center;">${dowStr}</td>
-            <td>${escapeToExcelCell(contentRaw)}</td>
-            <td style="text-align: center;">${escapeToExcelCell(managerRaw)}</td>
-          </tr>
-      `;
+          htmlTableContent += `
+            <tr>
+              <td style="text-align: center;">${dayNum}</td>
+              <td style="text-align: center;">${dowStr}</td>
+              <td>${escapeToExcelCell(contentText)}</td>
+              <td style="text-align: center;">${escapeToExcelCell(managerText)}</td>
+            </tr>
+          `;
+        });
+      }
     });
 
     if (gNotice || cNotice) {
