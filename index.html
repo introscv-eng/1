@@ -23,7 +23,7 @@ body { font-family: 'Inter', sans-serif; }
 
 <script type="text/babel">
 const SUPABASE_URL = "https://tygsgurwjpojzzrtyhrq.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzIyMzI2OH0.VR63l1j_PMhetS3pY3RsIT6G3sFFZZlZNjEg39dtn6s";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6InFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzIyMzI2OH0.VR63l1j_PMhetS3pY3RsIT6G3sFFZZlZNjEg39dtn6s";
 
 const { useState, useMemo, useEffect, useCallback } = React;
 
@@ -171,9 +171,11 @@ function Modal({ title, onClose, children, wide = false }) {
       <div className={`w-full ${wide ? "max-w-2xl" : "max-w-sm"} rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5 relative my-8`}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-800">{title}</h3>
-          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-            <XIcon size={18} />
-          </button>
+          {onClose && (
+            <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <XIcon size={18} />
+            </button>
+          )}
         </div>
         {children}
       </div>
@@ -310,7 +312,7 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
           })
         )}
       </div>
-      <button onClick={() => onAddEvent(dateStr)} className="flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-slate-300 transition hover:bg-violet-100 hover:text-violet-500" title="일정 추가">
+      <button onClick={() => onAddEvent(dateStr)} className="flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-slate-300 transition hover:bg-violet-100 hover:text-violet-500" title="이 날짜에 일정 추가">
         <PlusIcon size={16} />
       </button>
     </div>
@@ -323,6 +325,7 @@ function App() {
   const [viewDate, setViewDate] = useState(new Date());
   const [weekAnchor, setWeekAnchor] = useState(new Date());
 
+  // 최초 접속 시 저장된 학교가 없으면 모달을 띄우고, 저장되어 있으면 해당 학교로 바로 시작
   const savedSchool = localStorage.getItem("sp_school");
   const [currentOffice, setCurrentOffice] = useState(() => localStorage.getItem("sp_office") || "서부교육지원청");
   const [currentSchool, setCurrentSchool] = useState(() => savedSchool || "");
@@ -1420,6 +1423,18 @@ function App() {
     }
   };
 
+  const deleteEvent = async () => {
+    if (!isAdminMode && pwCheckInput !== eventModal.data.password && pwCheckInput !== currentClassPassword && pwCheckInput !== masterPassword) {
+      setPwCheckError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    if (supabase) {
+      await supabase.from('events').delete().eq('id', eventModal.data.id);
+    }
+    setEvents(prev => prev.filter(e => e.id !== eventModal.data.id));
+    setEventModal(null);
+  };
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-violet-50 via-white to-white p-4 pb-32 sm:p-6 sm:pb-36">
       <div className="mx-auto max-w-3xl">
@@ -1658,9 +1673,9 @@ function App() {
           })}
         </div>
 
-        {/* 학교 변경 모달 */}
+        {/* 학교 변경 모달 (최초 접속 시 또는 [학교 변경] 클릭 시) */}
         {schoolModalOpen && (
-          <Modal title="소속 초등학교 선택 (최초 1회 설정)" onClose={() => { if(currentSchool) setSchoolModalOpen(false); }} wide>
+          <Modal title="소속 초등학교 선택 (최초 1회 설정)" onClose={currentSchool ? () => setSchoolModalOpen(false) : null} wide>
             <div className="space-y-4">
               <div className="rounded-xl bg-violet-50 p-3 text-xs text-violet-800 font-semibold">
                 ✨ 최초 1회 소속 학교를 선택하시면, 다음 접속부터는 이 학교 화면으로 자동 시작됩니다.
@@ -1807,7 +1822,7 @@ function App() {
         {/* 일정 추가/수정 모달 */}
         {eventModal && (
           <Modal title={eventModal.mode === "add" ? "일정 일괄 추가" : "일정 수정"} onClose={() => setEventModal(null)} wide>
-            <div className="space-y-3">
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
               <div>
                 <FieldLabel>행사 내용</FieldLabel>
                 <input type="text" value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} placeholder="예) 현장체험학습" className={inputCls}/>
