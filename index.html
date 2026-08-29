@@ -80,7 +80,7 @@ const UploadCloudIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
 );
 
-const GRADES = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
+const INITIAL_GRADES = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
 const DEFAULT_CLASS_CONFIG = {
   classCount: 6,
   specialists: ["전담1", "전담2"]
@@ -264,7 +264,17 @@ function App() {
   const [viewDate, setViewDate] = useState(new Date());
   const [weekAnchor, setWeekAnchor] = useState(new Date());
 
-  const [selectedGrade, setSelectedGrade] = useState(() => localStorage.getItem("sp_last_grade") || "1학년");
+  // 가변 학년 목록 상태 (관리자 모드에서 추가/삭제 가능)
+  const [gradesList, setGradesList] = useState(() => {
+    try {
+      const saved = localStorage.getItem("sp_grade_list");
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return INITIAL_GRADES;
+  });
+  const [newGradeInput, setNewGradeInput] = useState("");
+
+  const [selectedGrade, setSelectedGrade] = useState(() => localStorage.getItem("sp_last_grade") || (gradesList[0] || "1학년"));
   const [selectedClass, setSelectedClass] = useState(() => localStorage.getItem("sp_last_class") || null);
 
   const [todayPosition, setTodayPosition] = useState(() => localStorage.getItem("sp_today_pos") || "header");
@@ -281,7 +291,7 @@ function App() {
       if (saved) return JSON.parse(saved);
     } catch(e) {}
     const init = {};
-    GRADES.forEach(g => { init[g] = { classCount: 6, specialists: ["전담1", "전담2"] }; });
+    INITIAL_GRADES.forEach(g => { init[g] = { classCount: 6, specialists: ["전담1", "전담2"] }; });
     return init;
   });
 
@@ -490,12 +500,14 @@ function App() {
   };
 
   const openClassConfigModal = () => {
-    setEditingConfigGrade(selectedGrade);
-    const cfg = gradeConfigs[selectedGrade] || DEFAULT_CLASS_CONFIG;
+    const currentTargetGrade = gradesList.includes(selectedGrade) ? selectedGrade : (gradesList[0] || "1학년");
+    setEditingConfigGrade(currentTargetGrade);
+    const cfg = gradeConfigs[currentTargetGrade] || DEFAULT_CLASS_CONFIG;
     setCfgClassCount(cfg.classCount || 6);
     setCfgSpecialists(cfg.specialists || ["전담1", "전담2"]);
     setNewSpecialistInput("");
-    setSelectedPwGrade(selectedGrade);
+    setNewGradeInput("");
+    setSelectedPwGrade(currentTargetGrade);
     setSelectedPwClass("1반");
     setCustomNewPwInput("");
     setCustomNewPwConfirm("");
@@ -517,6 +529,69 @@ function App() {
       await supabase.from('admin_status').upsert([{ week_key: 'grade_configs_data', data: updated }]);
     }
     alert(`${editingConfigGrade}의 학급 및 전담 설정이 적용되었습니다.`);
+  };
+
+  // 관리자 전용: 학년 추가 기능
+  const handleAddGrade = async () => {
+    if (!isAdminMode) return;
+    const trimmed = newGradeInput.trim();
+    if (!trimmed) {
+      alert("추가할 학년 명칭을 입력해주세요.");
+      return;
+    }
+    const formatted = trimmed.includes("학년") || trimmed.includes("유치원") || trimmed.includes("반") ? trimmed : `${trimmed}학년`;
+    if (gradesList.includes(formatted)) {
+      alert("이미 존재하는 학년 명칭입니다.");
+      return;
+    }
+    const nextGrades = [...gradesList, formatted];
+    setGradesList(nextGrades);
+    localStorage.setItem("sp_grade_list", JSON.stringify(nextGrades));
+    
+    // 기본 학급 구성 등록
+    const updatedConfigs = {
+      ...gradeConfigs,
+      [formatted]: DEFAULT_CLASS_CONFIG
+    };
+    setGradeConfigs(updatedConfigs);
+    localStorage.setItem("sp_grade_configs", JSON.stringify(updatedConfigs));
+
+    if (supabase) {
+      await supabase.from('admin_status').upsert([
+        { week_key: 'grade_list_data', data: nextGrades },
+        { week_key: 'grade_configs_data', data: updatedConfigs }
+      ]);
+    }
+    setNewGradeInput("");
+    setEditingConfigGrade(formatted);
+    alert(`'${formatted}'이(가) 추가되었습니다.`);
+  };
+
+  // 관리자 전용: 학년 삭제 기능
+  const handleDeleteGrade = async (gradeToDelete) => {
+    if (!isAdminMode) return;
+    if (gradesList.length <= 1) {
+      alert("최소 1개 이상의 학년이 유지되어야 합니다.");
+      return;
+    }
+    if (!confirm(`'${gradeToDelete}'을(를) 학년 목록에서 삭제하시겠습니까?`)) return;
+
+    const nextGrades = gradesList.filter(g => g !== gradeToDelete);
+    setGradesList(nextGrades);
+    localStorage.setItem("sp_grade_list", JSON.stringify(nextGrades));
+
+    if (selectedGrade === gradeToDelete) {
+      setSelectedGrade(nextGrades[0]);
+      localStorage.setItem("sp_last_grade", nextGrades[0]);
+    }
+    if (editingConfigGrade === gradeToDelete) {
+      setEditingConfigGrade(nextGrades[0]);
+    }
+
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: 'grade_list_data', data: nextGrades }]);
+    }
+    alert(`'${gradeToDelete}'이(가) 삭제되었습니다.`);
   };
 
   const handleUpdateTodayPosition = async (newPos) => {
@@ -595,7 +670,6 @@ function App() {
   const [csvFileName, setCsvFileName] = useState("");
   const [csvError, setCsvError] = useState("");
 
-  // 요청된 열 너비(날짜 15, 학년 8, 학급 15, 행사내용 40, 일정분야 12, 담당자 10, 비밀번호 10)가 고정 적용된 엑셀 전용 템플릿
   const downloadCsvTemplate = () => {
     const xmlTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 <?mso-application progid="Excel.Sheet"?>
@@ -638,7 +712,6 @@ function App() {
  </Styles>
  <Worksheet ss:Name="일정업로드양식">
   <Table>
-   <!-- 엑셀 열너비 설정: 1ch ≈ 7.5pt (날짜:15, 학년:8, 학급:15, 행사내용:40, 일정분야:12, 담당자:10, 비밀번호:10) -->
    <Column ss:Width="112.5"/>
    <Column ss:Width="60"/>
    <Column ss:Width="112.5"/>
@@ -778,7 +851,6 @@ function App() {
       try {
         const text = event.target.result;
         
-        // XML 기반 SpreadsheetML 파싱 처리
         if (text.includes("<?xml") || text.includes("<Workbook")) {
           const parser = new DOMParser();
           const xmlDoc = parser.parseFromString(text, "text/xml");
@@ -821,7 +893,6 @@ function App() {
           return;
         }
 
-        // 일반 텍스트 CSV 파싱 처리
         const lines = text.split(/\r\n|\n/).map(l => l.trim()).filter(l => l.length > 0);
         if (lines.length <= 1) {
           setCsvError("업로드한 파일에 유효한 데이터 행이 존재하지 않습니다.");
@@ -931,6 +1002,11 @@ function App() {
           } else if (item.week_key === 'grade_configs_data') {
             setGradeConfigs(item.data || {});
             localStorage.setItem("sp_grade_configs", JSON.stringify(item.data || {}));
+          } else if (item.week_key === 'grade_list_data') {
+            if (Array.isArray(item.data) && item.data.length > 0) {
+              setGradesList(item.data);
+              localStorage.setItem("sp_grade_list", JSON.stringify(item.data));
+            }
           } else if (item.week_key === 'master_password_data') {
             if (item.data && item.data.password) {
               setMasterPassword(item.data.password);
@@ -1488,7 +1564,7 @@ function App() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-xs font-bold text-slate-500 mr-1.5">학년:</span>
-                {GRADES.map(g => (
+                {gradesList.map(g => (
                   <button
                     key={g}
                     onClick={() => handleGradeClick(g)}
@@ -1868,10 +1944,11 @@ function App() {
           </Modal>
         )}
 
-        {/* 학급 설정 및 비밀번호 관리 모달 */}
+        {/* 학급 설정 및 비밀번호 관리 모달 (학년 추가/삭제 기능 추가) */}
         {classConfigModalOpen && (
           <Modal title="학급 구성 및 환경/비밀번호 관리" onClose={() => setClassConfigModalOpen(false)} wide>
             <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+              
               {/* 0. 오늘의 행사 창 표시 위치 설정 */}
               <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-2">
                 <span className="text-xs font-extrabold text-slate-900 block">📌 오늘의 행사 표시 위치 설정</span>
@@ -1906,33 +1983,75 @@ function App() {
                 </div>
               </div>
 
-              {/* 1. 학년별 학급 및 전담 구성 */}
+              {/* 1. 학년 및 학급/전담 구성 (관리자 모드 학년 추가/삭제 지원) */}
               <div className="rounded-2xl border border-violet-100 bg-violet-50/40 p-3.5 space-y-3">
-                <span className="text-xs font-extrabold text-violet-900 block">1. 학년별 학급 및 전담 구성</span>
-                <div>
-                  <FieldLabel>설정 대상 학년</FieldLabel>
-                  <div className="flex flex-wrap gap-1.5">
-                    {GRADES.map(g => (
-                      <button
-                        key={g}
-                        type="button"
-                        onClick={() => {
-                          setEditingConfigGrade(g);
-                          const cfg = gradeConfigs[g] || DEFAULT_CLASS_CONFIG;
-                          setCfgClassCount(cfg.classCount || 6);
-                          setCfgSpecialists(cfg.specialists || ["전담1", "전담2"]);
-                        }}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${editingConfigGrade === g ? "bg-violet-600 text-white shadow-xs" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"}`}
-                      >
-                        {g}
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-violet-900 block">1. 학년 목록 및 학급/전담 구성</span>
+                  {isAdminMode && (
+                    <span className="rounded bg-amber-100 border border-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                      👑 관리자: 학년 추가/삭제 가능
+                    </span>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <FieldLabel>운영 학년 목록 (클릭하여 해당 학년 설정)</FieldLabel>
+                  <div className="flex flex-wrap gap-1.5">
+                    {gradesList.map(g => (
+                      <div
+                        key={g}
+                        className={`inline-flex items-center rounded-lg border transition ${editingConfigGrade === g ? "bg-violet-600 text-white border-violet-600 shadow-xs" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingConfigGrade(g);
+                            const cfg = gradeConfigs[g] || DEFAULT_CLASS_CONFIG;
+                            setCfgClassCount(cfg.classCount || 6);
+                            setCfgSpecialists(cfg.specialists || ["전담1", "전담2"]);
+                          }}
+                          className="px-2.5 py-1 text-xs font-bold"
+                        >
+                          {g}
+                        </button>
+                        {isAdminMode && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteGrade(g)}
+                            className="pr-1.5 pl-0.5 text-slate-400 hover:text-rose-300 transition"
+                            title="이 학년 삭제"
+                          >
+                            <XIcon size={12} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 관리자 전용 학년 추가 인풋 */}
+                  {isAdminMode && (
+                    <div className="flex items-center gap-1.5 pt-2">
+                      <input
+                        type="text"
+                        value={newGradeInput}
+                        onChange={(e) => setNewGradeInput(e.target.value)}
+                        placeholder="예) 유치원, 7학년, 특수과정 등"
+                        className="rounded-lg border border-violet-200 bg-white px-2.5 py-1 text-xs text-slate-700 outline-none focus:border-violet-500 w-48"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddGrade}
+                        className="rounded-lg bg-violet-600 px-3 py-1 text-xs font-bold text-white hover:bg-violet-700 transition"
+                      >
+                        + 학년 추가
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-violet-100">
                   <div className="rounded-xl border border-slate-200 bg-white p-2.5">
-                    <FieldLabel>일반 학급 수</FieldLabel>
+                    <FieldLabel>[{editingConfigGrade}] 일반 학급 수</FieldLabel>
                     <div className="flex items-center gap-1.5">
                       <input
                         type="number"
@@ -1947,7 +2066,7 @@ function App() {
                   </div>
 
                   <div className="rounded-xl border border-slate-200 bg-white p-2.5">
-                    <FieldLabel>전담/특별반 추가</FieldLabel>
+                    <FieldLabel>[{editingConfigGrade}] 전담/특별반 추가</FieldLabel>
                     <div className="flex items-center gap-1">
                       <input
                         type="text"
@@ -2019,7 +2138,7 @@ function App() {
                       }}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none"
                     >
-                      {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                      {gradesList.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                   </div>
                   <div>
@@ -2273,7 +2392,7 @@ function App() {
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5">
                   <FieldLabel>등록 대상 학년 선택 (관리자 일괄 지정)</FieldLabel>
                   <div className="flex flex-wrap gap-1.5">
-                    {GRADES.map(g => (
+                    {gradesList.map(g => (
                       <button
                         key={g}
                         type="button"
