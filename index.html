@@ -412,7 +412,15 @@ function App() {
 
   const [events, setEvents] = useState([]);
 
-  const emptyForm = { date: ymd(today), category: "학습", content: "", manager: "", password: "", isGradeCommon: false };
+  const emptyForm = { 
+    date: ymd(today), 
+    category: "학습", 
+    content: "", 
+    manager: "", 
+    password: "", 
+    targetType: "all", // "all": 전체반, "custom": 특정 대상 선택
+    selectedTargets: [] // 선택된 반/전담 목록
+  };
   const [eventModal, setEventModal] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [pwCheckInput, setPwCheckInput] = useState("");
@@ -450,11 +458,14 @@ function App() {
     return () => clearInterval(timer);
   }, [supabase, fetchAllData]);
 
-  // 학년 공통일 경우 classNum과 무관하게 해당 학년 전체에 1개만 깔끔하게 표시되도록 필터링 개선
+  // 학년 공통이거나, 현재 선택한 학급과 classNum이 일치하는 일정만 필터링
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (e.grade !== selectedGrade) return false;
-      if (e.category === "학년 공통") return true;
+      if (e.category === "학년 공통") {
+        if (!e.targetList || e.targetList.length === 0) return true; // 전체 공통
+        return e.targetList.includes(selectedClass); // 특정 대상에 포함되어 있으면 표시
+      }
       return e.classNum === selectedClass;
     });
   }, [events, selectedGrade, selectedClass]);
@@ -463,8 +474,7 @@ function App() {
     const map = {};
     filteredEvents.forEach((e) => {
       if (!map[e.date]) map[e.date] = [];
-      // 중복 방지를 위해 동일한 내용/날짜/카테고리인 경우 1개만 담기
-      const isDuplicate = map[e.date].some(item => item.content === e.content && item.category === e.category && item.date === e.date);
+      const isDuplicate = map[e.date].some(item => item.id === e.id || (item.content === e.content && item.category === e.category && item.date === e.date));
       if (!isDuplicate) {
         map[e.date].push(e);
       }
@@ -515,7 +525,7 @@ function App() {
 
   const confirmBatchDelete = async () => {
     if (deletePwInput !== currentClassPassword) {
-      setDeletePwError("담임 설정 비밀번호가 일치하지 않습니다.");
+      setDeletePwError("비밀번호가 일치하지 않습니다.");
       return;
     }
 
@@ -645,10 +655,11 @@ function App() {
         content: copiedEvent.content || "",
         manager: copiedEvent.manager || "",
         password: copiedEvent.password || "",
-        isGradeCommon: copiedEvent.isGradeCommon || false
+        targetType: copiedEvent.targetType || "all",
+        selectedTargets: copiedEvent.selectedTargets || []
       });
     } else {
-      setForm({ ...emptyForm, date: dateStr || ymd(today) });
+      setForm({ ...emptyForm, date: dateStr || ymd(today), selectedTargets: [...classList] });
     }
     setPwCheckInput("");
     setPwCheckError("");
@@ -662,7 +673,8 @@ function App() {
       content: ev.content,
       manager: ev.manager || "",
       password: ev.password,
-      isGradeCommon: ev.category === "학년 공통"
+      targetType: ev.targetList && ev.targetList.length > 0 ? "custom" : "all",
+      selectedTargets: ev.targetList || [...classList]
     });
     setPwCheckInput("");
     setPwCheckError("");
@@ -671,50 +683,43 @@ function App() {
 
   const copyCurrentEvent = () => {
     if (!form.content.trim()) return;
-    setCopiedEvent({ category: form.category, content: form.content, manager: form.manager, password: form.password, isGradeCommon: form.isGradeCommon });
+    setCopiedEvent({ 
+      category: form.category, 
+      content: form.content, 
+      manager: form.manager, 
+      password: form.password, 
+      targetType: form.targetType,
+      selectedTargets: form.selectedTargets
+    });
     setEventModal(null);
   };
 
   const saveEvent = async () => {
     if (!form.content.trim()) return;
-    const finalCategory = form.isGradeCommon ? "학년 공통" : form.category;
+    const isGradeCommon = form.category === "학년 공통";
+    const eventPassword = form.password.trim() || currentClassPassword;
 
     if (eventModal.mode === "add") {
-      const eventPassword = form.password.trim() || currentClassPassword;
-      
-      if (finalCategory === "학년 공통") {
-        // 학년 공통은 해당 학년 전체에 1개의 데이터만 등록되도록 수정
-        const newEv = {
-          id: Math.floor(Date.now() % 2147483647),
-          date: form.date,
-          grade: selectedGrade,
-          classNum: "ALL",
-          category: "학년 공통",
-          content: form.content,
-          manager: form.manager,
-          password: eventPassword
-        };
+      const newEv = {
+        id: Math.floor(Date.now() % 2147483647),
+        date: form.date,
+        grade: selectedGrade,
+        classNum: isGradeCommon ? "ALL" : selectedClass,
+        category: form.category,
+        content: form.content,
+        manager: form.manager,
+        password: eventPassword,
+        targetList: isGradeCommon && form.targetType === "custom" ? form.selectedTargets : []
+      };
 
-        if (supabase) {
-          await supabase.from('events').insert([newEv]);
+      if (supabase) {
+        const { error } = await supabase.from('events').insert([newEv]);
+        if (error) {
+          alert("저장 실패: " + error.message);
+          return;
         }
-        setEvents(prev => [...prev, newEv]);
-      } else {
-        const newEv = {
-          id: Math.floor(Date.now() % 2147483647),
-          date: form.date,
-          grade: selectedGrade,
-          classNum: selectedClass,
-          category: finalCategory,
-          content: form.content,
-          manager: form.manager,
-          password: eventPassword
-        };
-        if (supabase) {
-          await supabase.from('events').insert([newEv]);
-        }
-        setEvents(prev => [...prev, newEv]);
       }
+      setEvents(prev => [...prev, newEv]);
       setEventModal(null);
     } else {
       if (pwCheckInput !== eventModal.data.password && pwCheckInput !== currentClassPassword) {
@@ -723,12 +728,18 @@ function App() {
       }
       const updatePayload = {
         date: form.date,
-        category: finalCategory,
+        category: form.category,
         content: form.content,
-        manager: form.manager
+        manager: form.manager,
+        classNum: isGradeCommon ? "ALL" : selectedClass,
+        targetList: isGradeCommon && form.targetType === "custom" ? form.selectedTargets : []
       };
       if (supabase) {
-        await supabase.from('events').update(updatePayload).eq('id', eventModal.data.id);
+        const { error } = await supabase.from('events').update(updatePayload).eq('id', eventModal.data.id);
+        if (error) {
+          alert("수정 실패: " + error.message);
+          return;
+        }
       }
       setEvents((prev) => prev.map((e) => (e.id === eventModal.data.id ? { ...e, ...updatePayload } : e)));
       setEventModal(null);
@@ -1093,20 +1104,57 @@ function App() {
                   {EVENT_CATEGORIES.map((cat) => ( <option key={cat} value={cat}>{cat}</option> ))}
                 </select>
               </div>
-              {eventModal.mode === "add" && (
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="checkbox"
-                    id="gradeCommonCheck"
-                    checked={form.isGradeCommon}
-                    onChange={(e) => setForm({ ...form, isGradeCommon: e.target.checked, category: e.target.checked ? "학년 공통" : "학습" })}
-                    className="h-4 w-4 rounded border-slate-300 text-violet-600 cursor-pointer"
-                  />
-                  <label htmlFor="gradeCommonCheck" className="text-xs font-bold text-slate-700 cursor-pointer">
-                    학년 공통으로 등록 (선택한 학년의 모든 반 및 전담에 일괄 반영됩니다)
-                  </label>
+
+              {/* '학년 공통' 선택 시 전체 등록 또는 특정 학급/전담 선택 옵션 제공 */}
+              {form.category === "학년 공통" && (
+                <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-3.5 space-y-2.5">
+                  <FieldLabel>학년 공통 적용 대상</FieldLabel>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="targetType" 
+                        checked={form.targetType === "all"} 
+                        onChange={() => setForm({ ...form, targetType: "all" })}
+                        className="text-violet-600 focus:ring-violet-400"
+                      />
+                      전체 등록 (모든 반 및 전담)
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="targetType" 
+                        checked={form.targetType === "custom"} 
+                        onChange={() => setForm({ ...form, targetType: "custom", selectedTargets: [...classList] })}
+                        className="text-violet-600 focus:ring-violet-400"
+                      />
+                      특정 학급/전담 지정
+                    </label>
+                  </div>
+
+                  {form.targetType === "custom" && (
+                    <div className="pt-2 border-t border-violet-200/60 flex flex-wrap gap-2">
+                      {classList.map(c => {
+                        const isChecked = form.selectedTargets.includes(c);
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => {
+                              const next = isChecked ? form.selectedTargets.filter(item => item !== c) : [...form.selectedTargets, c];
+                              setForm({ ...form, selectedTargets: next });
+                            }}
+                            className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition ${isChecked ? "bg-violet-600 text-white border-violet-600 shadow-2xs" : "bg-white text-slate-600 border-slate-200 hover:bg-violet-50"}`}
+                          >
+                            {isChecked ? `✓ ${c}` : `+ ${c}`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
+
               <div>
                 <FieldLabel>행사 내용</FieldLabel>
                 <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={2} className={inputCls} placeholder="예) 현장체험학습 (서울랜드)" />
