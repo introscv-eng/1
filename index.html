@@ -346,50 +346,39 @@ function App() {
   const [tempOffice, setTempOffice] = useState(currentOffice);
   const [tempSchool, setTempSchool] = useState(currentSchool || "인천경연초등학교");
   const [schoolSearchQuery, setSchoolSearchQuery] = useState("");
+  
+  // 학교 변경/시작 시 비밀번호 확인 모달 상태
+  const [schoolAuthModalOpen, setSchoolAuthModalOpen] = useState(false);
+  const [schoolAuthPwInput, setSchoolAuthPwInput] = useState("");
+  const [pendingSchoolChange, setPendingSchoolChange] = useState(null); // {office, school}
 
-  const [gradesList, setGradesList] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`sp_grade_list_${currentSchool}`);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return INITIAL_GRADES;
-  });
+  const [masterPassword, setMasterPassword] = useState("admin1234");
+  const [classPasswords, setClassPasswords] = useState({});
+
+  const [gradesList, setGradesList] = useState(INITIAL_GRADES);
   const [newGradeInput, setNewGradeInput] = useState("");
-  const [selectedGrade, setSelectedGrade] = useState(() =>
-    localStorage.getItem(`sp_last_grade_${currentSchool}`) || (gradesList[0] || "1학년")
-  );
-  const [selectedClass, setSelectedClass] = useState(() =>
-    localStorage.getItem(`sp_last_class_${currentSchool}`) || null
-  );
+  const [selectedGrade, setSelectedGrade] = useState("1학년");
+  const [selectedClass, setSelectedClass] = useState(null);
 
-  const [todayPosition, setTodayPosition] = useState(() =>
-    localStorage.getItem("sp_today_pos") || "header"
-  );
+  const [todayPosition, setTodayPosition] = useState("header");
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [masterPassword, setMasterPassword] = useState(() =>
-    localStorage.getItem(`sp_master_pw_${currentSchool}`) || "admin1234"
-  );
   const [adminAuthModalOpen, setAdminAuthModalOpen] = useState(false);
   const [adminAuthPwInput, setAdminAuthPwInput] = useState("");
   const [adminAuthError, setAdminAuthError] = useState("");
 
   const [gradeConfigs, setGradeConfigs] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`sp_grade_configs_${currentSchool}`);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
     const init = {};
     INITIAL_GRADES.forEach(g => { init[g] = { classCount: 6, specialists: ["전담1", "전담2"] }; });
     return init;
   });
 
   const [classConfigModalOpen, setClassConfigModalOpen] = useState(false);
-  const [editingConfigGrade, setEditingConfigGrade] = useState(selectedGrade);
+  const [editingConfigGrade, setEditingConfigGrade] = useState("1학년");
   const [cfgClassCount, setCfgClassCount] = useState(6);
   const [cfgSpecialists, setCfgSpecialists] = useState(["전담1", "전담2"]);
   const [newSpecialistInput, setNewSpecialistInput] = useState("");
 
-  const [selectedPwGrade, setSelectedPwGrade] = useState(selectedGrade);
+  const [selectedPwGrade, setSelectedPwGrade] = useState("1학년");
   const [selectedPwClass, setSelectedPwClass] = useState("1반");
   const [customNewPwInput, setCustomNewPwInput] = useState("");
   const [customNewPwConfirm, setCustomNewPwConfirm] = useState("");
@@ -401,10 +390,6 @@ function App() {
     for (let i = 1; i <= cfg.classCount; i++) classes.push(`${i}반`);
     return [...classes, ...(cfg.specialists || [])];
   }, [selectedGrade, gradeConfigs]);
-
-  const [classPasswords, setClassPasswords] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`sp_class_pw_${currentSchool}`)) || {}; } catch { return {}; }
-  });
 
   const [targetSwitch, setTargetSwitch] = useState(null);
   const [switchPwInput, setSwitchPwInput] = useState("");
@@ -464,7 +449,8 @@ function App() {
     }
 
     if (switchPwInput !== registeredPw && switchPwInput !== masterPassword) {
-      setSwitchError("비밀번호가 일치하지 않습니다.");
+      setSwitchError("비밀번호가 일치하지 않습니다. 틀렸습니다.");
+      alert("비밀번호가 일치하지 않습니다.");
       return;
     }
     setSelectedGrade(grade);
@@ -492,6 +478,7 @@ function App() {
       alert("관리자 모드로 전환되었습니다.");
     } else {
       setAdminAuthError("마스터 비밀번호가 일치하지 않습니다.");
+      alert("마스터 비밀번호가 틀렸습니다.");
     }
   };
 
@@ -501,17 +488,13 @@ function App() {
   const [deletePwInput, setDeletePwInput] = useState("");
   const [deletePwError, setDeletePwError] = useState("");
 
-  const [customHolidays, setCustomHolidays] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`sp_holidays_${currentSchool}`)) || {}; } catch { return {}; }
-  });
+  const [customHolidays, setCustomHolidays] = useState({});
   const [holidayModalOpen, setHolidayModalOpen] = useState(false);
   const [holidayCalendarDate, setHolidayCalendarDate] = useState(new Date());
   const [selectedHolidayDate, setSelectedHolidayDate] = useState(ymd(new Date()));
   const [holidayNameInput, setHolidayNameInput] = useState("재량휴업일");
 
-  const [notices, setNotices] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`sp_notices_${currentSchool}`)) || {}; } catch { return {}; }
-  });
+  const [notices, setNotices] = useState({});
 
   const getPeriodKey = (scopeType) => {
     const period = tab === "month"
@@ -551,6 +534,15 @@ function App() {
     const cfg = gradeConfigs[selectedGrade] || DEFAULT_CLASS_CONFIG;
     setCfgClassCount(cfg.classCount || 6);
     setCfgSpecialists(cfg.specialists || ["전담1", "전담2"]);
+    
+    // 일반 모드일 경우 기본 선택된 학년/학급을 현재 내 반으로 고정
+    if (!isAdminMode && selectedClass) {
+      setSelectedPwGrade(selectedGrade);
+      setSelectedPwClass(selectedClass);
+    } else {
+      setSelectedPwGrade(selectedGrade);
+      setSelectedPwClass("1반");
+    }
     setClassConfigModalOpen(true);
   };
 
@@ -592,6 +584,11 @@ function App() {
               setMasterPassword(item.data.password);
               localStorage.setItem(`sp_master_pw_${currentSchool}`, item.data.password);
             }
+          } else if (item.week_key === `class_pw_${currentSchool}`) {
+            if (item.data) {
+              setClassPasswords(item.data);
+              localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(item.data));
+            }
           } else if (item.week_key === 'today_pos_setting') {
             if (item.data && item.data.pos) {
               setTodayPosition(item.data.pos);
@@ -604,11 +601,25 @@ function App() {
   }, [supabase, currentSchool]);
 
   useEffect(() => {
+    // 로컬 스토리지 선적재 복원
+    if (currentSchool) {
+      try {
+        const h = localStorage.getItem(`sp_holidays_${currentSchool}`); if (h) setCustomHolidays(JSON.parse(h));
+        const n = localStorage.getItem(`sp_notices_${currentSchool}`); if (n) setNotices(JSON.parse(n));
+        const c = localStorage.getItem(`sp_grade_configs_${currentSchool}`); if (c) setGradeConfigs(JSON.parse(c));
+        const g = localStorage.getItem(`sp_grade_list_${currentSchool}`); if (g) setGradesList(JSON.parse(g));
+        const mp = localStorage.getItem(`sp_master_pw_${currentSchool}`); if (mp) setMasterPassword(mp);
+        const cp = localStorage.getItem(`sp_class_pw_${currentSchool}`); if (cp) setClassPasswords(JSON.parse(cp));
+        const tp = localStorage.getItem("sp_today_pos"); if (tp) setTodayPosition(tp);
+        const lg = localStorage.getItem(`sp_last_grade_${currentSchool}`); if (lg) setSelectedGrade(lg);
+        const lc = localStorage.getItem(`sp_last_class_${currentSchool}`); if (lc) setSelectedClass(lc);
+      } catch(e){}
+    }
     fetchAllData();
     if (!supabase) return;
     const timer = setInterval(fetchAllData, 5000);
     return () => clearInterval(timer);
-  }, [supabase, fetchAllData]);
+  }, [supabase, currentSchool, fetchAllData]);
 
   const handleUpdateTodayPosition = async (newPos) => {
     setTodayPosition(newPos);
@@ -619,6 +630,10 @@ function App() {
   };
 
   const handleAddGrade = async () => {
+    if (!isAdminMode) {
+      alert("학년 추가/삭제는 관리자 모드에서만 가능합니다.");
+      return;
+    }
     const trimmed = newGradeInput.trim();
     if (!trimmed) {
       alert("추가할 학년 명칭을 입력해주세요.");
@@ -648,6 +663,10 @@ function App() {
   };
 
   const handleDeleteGrade = async (gradeToDelete) => {
+    if (!isAdminMode) {
+      alert("학년 추가/삭제는 관리자 모드에서만 가능합니다.");
+      return;
+    }
     if (gradesList.length <= 1) {
       alert("최소 1개 이상의 학년이 유지되어야 합니다.");
       return;
@@ -671,6 +690,10 @@ function App() {
   };
 
   const handleSaveGradeConfig = async () => {
+    if (!isAdminMode) {
+      alert("학급 수 및 전담 구성 변경은 관리자 모드에서만 가능합니다.");
+      return;
+    }
     const updated = {
       ...gradeConfigs,
       [editingConfigGrade]: {
@@ -687,6 +710,14 @@ function App() {
   };
 
   const handleChangeClassPw = async () => {
+    // 일반 모드일 경우 반드시 본인의 현재 선택된 학년/학급만 변경 가능
+    if (!isAdminMode) {
+      if (selectedPwGrade !== selectedGrade || selectedPwClass !== selectedClass) {
+        alert("일반 모드에서는 본인이 접속 중인 학급의 비밀번호만 변경할 수 있습니다.");
+        return;
+      }
+    }
+
     const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
     const newPw = customNewPwInput.trim();
     const confirmPw = customNewPwConfirm.trim();
@@ -778,18 +809,33 @@ function App() {
   };
 
   const handleChangeSchool = () => {
-    localStorage.removeItem("sp_school");
-    localStorage.removeItem("sp_office");
-    setCurrentSchool("");
+    setTempOffice(currentOffice);
+    setTempSchool(currentSchool || "인천경연초등학교");
+    setSchoolAuthPwInput("");
+    setPendingSchoolChange(null);
     setSchoolModalOpen(true);
   };
 
-  const handleApplySchoolChange = (newOffice, newSch) => {
-    setCurrentOffice(newOffice);
-    setCurrentSchool(newSch);
-    localStorage.setItem("sp_office", newOffice);
-    localStorage.setItem("sp_school", newSch);
+  const handleTriggerSchoolSelect = (office, school) => {
+    setPendingSchoolChange({ office, school });
+    setSchoolAuthPwInput("");
+    setSchoolAuthModalOpen(true);
+  };
+
+  const confirmSchoolAuth = () => {
+    if (!pendingSchoolChange) return;
+    const { office, school } = pendingSchoolChange;
+    // 해당 학교의 마스터 혹은 공용 비밀번호 검증 (기본값 admin1234 혹은 설정된 masterPassword)
+    if (schoolAuthPwInput !== masterPassword && schoolAuthPwInput !== "1234") {
+      alert("비밀번호가 일치하지 않습니다. 틀렸습니다.");
+      return;
+    }
+    setCurrentOffice(office);
+    setCurrentSchool(school);
+    localStorage.setItem("sp_office", office);
+    localStorage.setItem("sp_school", school);
     setSelectedClass(null);
+    setSchoolAuthModalOpen(false);
     setSchoolModalOpen(false);
     window.location.reload();
   };
@@ -864,7 +910,8 @@ function App() {
 
   const confirmBatchDelete = async (forceAdmin = false) => {
     if (!forceAdmin && !isAdminMode && deletePwInput !== currentClassPassword && deletePwInput !== masterPassword) {
-      setDeletePwError("비밀번호가 일치하지 않습니다.");
+      setDeletePwError("비밀번호가 일치하지 않습니다. 틀렸습니다.");
+      alert("비밀번호가 일치하지 않습니다.");
       return;
     }
     const idsArr = Array.from(selectedEventIds);
@@ -1059,21 +1106,6 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
   const [pwCheckInput, setPwCheckInput] = useState("");
   const [pwCheckError, setPwCheckError] = useState("");
 
-  const generateCycles = (baseDateStr, repeatType, endDateStr) => {
-    if (repeatType === "none" || !baseDateStr || !endDateStr) return [{ date: baseDateStr }];
-    const intervalDays = repeatType === "weekly" ? 7 : 14;
-    const start = new Date(baseDateStr);
-    const end = new Date(endDateStr);
-    const cycles = [];
-    let cur = new Date(start);
-    while (cur <= end) {
-      cycles.push({ date: ymd(cur) });
-      cur = addDays(cur, intervalDays);
-      if (cycles.length > 52) break;
-    }
-    return cycles.length > 0 ? cycles : [{ date: baseDateStr }];
-  };
-
   const openAddEvent = (dateStr) => {
     const baseDate = dateStr || ymd(today);
     const defaultEnd = ymd(addMonths(new Date(baseDate), 1));
@@ -1155,7 +1187,8 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
       alert(`총 ${newEvents.length}건의 일정이 등록되었습니다.`);
     } else {
       if (!isAdminMode && pwCheckInput !== eventModal.data.password && pwCheckInput !== currentClassPassword && pwCheckInput !== masterPassword) {
-        setPwCheckError("비밀번호가 일치하지 않습니다.");
+        setPwCheckError("비밀번호가 일치하지 않습니다. 틀렸습니다.");
+        alert("비밀번호가 틀렸습니다.");
         return;
       }
       const row = form.schedules[0];
@@ -1181,7 +1214,8 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
 
   const deleteEvent = async () => {
     if (!isAdminMode && pwCheckInput !== eventModal.data.password && pwCheckInput !== currentClassPassword && pwCheckInput !== masterPassword) {
-      setPwCheckError("비밀번호가 일치하지 않습니다.");
+      setPwCheckError("비밀번호가 일치하지 않습니다. 틀렸습니다.");
+      alert("비밀번호가 틀렸습니다.");
       return;
     }
     if (supabase) {
@@ -1508,7 +1542,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                   )}
                   <button
                     type="button"
-                    onClick={() => handleApplySchoolChange(tempOffice, tempSchool)}
+                    onClick={() => handleTriggerSchoolSelect(tempOffice, tempSchool)}
                     className="flex-1 rounded-xl bg-violet-600 py-3 text-sm font-bold text-white hover:bg-violet-700 shadow-md shadow-violet-200 transition"
                   >
                     [{tempSchool}] 시작하기
@@ -1517,6 +1551,39 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
               </div>
             </div>
           </div>
+        )}
+
+        {/* 학교 변경/시작 시 비밀번호 확인 인증 모달 */}
+        {schoolAuthModalOpen && (
+          <Modal title={`[${pendingSchoolChange?.school}] 접속 인증`} onClose={() => setSchoolAuthModalOpen(false)}>
+            <p className="mb-3 text-xs text-slate-500 leading-relaxed">
+              해당 학교 플래너에 접속하려면 학교(마스터) 비밀번호를 입력해주세요.
+            </p>
+            <FieldLabel>비밀번호 (초기값: admin1234 또는 1234)</FieldLabel>
+            <input
+              type="password"
+              autoFocus
+              value={schoolAuthPwInput}
+              onChange={(e) => setSchoolAuthPwInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && confirmSchoolAuth()}
+              className={inputCls}
+              placeholder="비밀번호 입력"
+            />
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                onClick={() => setSchoolAuthModalOpen(false)}
+                className="flex-1 rounded-xl border py-2.5 text-sm font-bold text-slate-500"
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmSchoolAuth}
+                className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white shadow-xs"
+              >
+                확인 및 시작
+              </button>
+            </div>
+          </Modal>
         )}
 
         {/* 학급 전환 및 비밀번호 인증 모달 */}
@@ -1705,14 +1772,17 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                 </div>
               </div>
 
-              {/* 학년 추가/삭제 관리 */}
+              {/* 학년 추가/삭제 관리 (관리자 모드 전용) */}
               <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3 space-y-2">
-                <FieldLabel>학년 목록 관리 (추가 및 삭제)</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel>학년 목록 관리 (추가 및 삭제)</FieldLabel>
+                  {!isAdminMode && <span className="text-[10px] text-amber-600 font-bold">관리자 모드 전용</span>}
+                </div>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {gradesList.map(g => (
                     <div key={g} className="flex items-center gap-1 rounded-lg border border-violet-300 bg-white px-2.5 py-1 text-xs font-bold text-violet-800 shadow-2xs">
                       <span>{g}</span>
-                      {gradesList.length > 1 && (
+                      {isAdminMode && gradesList.length > 1 && (
                         <button type="button" onClick={() => handleDeleteGrade(g)} className="text-rose-400 hover:text-rose-600 ml-1">
                           <XIcon size={12} />
                         </button>
@@ -1720,27 +1790,32 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                     </div>
                   ))}
                 </div>
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    value={newGradeInput}
-                    onChange={(e) => setNewGradeInput(e.target.value)}
-                    placeholder="새 학년 이름 (예: 유치원, 특수학급)"
-                    className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddGrade}
-                    className="rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
-                  >
-                    + 학년 추가
-                  </button>
-                </div>
+                {isAdminMode && (
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={newGradeInput}
+                      onChange={(e) => setNewGradeInput(e.target.value)}
+                      placeholder="새 학년 이름 (예: 유치원, 특수학급)"
+                      className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddGrade}
+                      className="rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
+                    >
+                      + 학년 추가
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* 학급 수 및 전담 구성 */}
               <div className="rounded-xl border border-indigo-200 bg-indigo-50/30 p-3 space-y-3">
-                <FieldLabel>[{editingConfigGrade}] 학급 및 전담/특별반 구성</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel>[{editingConfigGrade}] 학급 및 전담/특별반 구성</FieldLabel>
+                  {!isAdminMode && <span className="text-[10px] text-amber-600 font-bold">관리자 모드 전용</span>}
+                </div>
                 <div className="flex flex-wrap gap-1 mb-2">
                   {gradesList.map(g => (
                     <button
@@ -1767,9 +1842,10 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                         type="number"
                         min="1"
                         max="15"
+                        disabled={!isAdminMode}
                         value={cfgClassCount}
                         onChange={(e) => setCfgClassCount(e.target.value)}
-                        className="w-20 rounded-lg border bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700 outline-none"
+                        className="w-20 rounded-lg border bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700 outline-none disabled:opacity-60"
                       />
                       <span className="text-xs font-bold text-slate-500">개반</span>
                     </div>
@@ -1780,24 +1856,27 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                     <div className="flex items-center gap-1">
                       <input
                         type="text"
+                        disabled={!isAdminMode}
                         value={newSpecialistInput}
                         onChange={(e) => setNewSpecialistInput(e.target.value)}
                         placeholder="예) 영어전담"
-                        className="flex-1 rounded-lg border bg-slate-50 px-2.5 py-1 text-xs text-slate-700 outline-none"
+                        className="flex-1 rounded-lg border bg-slate-50 px-2.5 py-1 text-xs text-slate-700 outline-none disabled:opacity-60"
                       />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const trimmed = newSpecialistInput.trim();
-                          if (trimmed && !cfgSpecialists.includes(trimmed)) {
-                            setCfgSpecialists(prev => [...prev, trimmed]);
-                            setNewSpecialistInput("");
-                          }
-                        }}
-                        className="rounded-lg bg-indigo-600 px-2 py-1 text-xs font-bold text-white shrink-0"
-                      >
-                        추가
-                      </button>
+                      {isAdminMode && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const trimmed = newSpecialistInput.trim();
+                            if (trimmed && !cfgSpecialists.includes(trimmed)) {
+                              setCfgSpecialists(prev => [...prev, trimmed]);
+                              setNewSpecialistInput("");
+                            }
+                          }}
+                          className="rounded-lg bg-indigo-600 px-2 py-1 text-xs font-bold text-white shrink-0"
+                        >
+                          추가
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1806,36 +1885,44 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                   {cfgSpecialists.map((spec, sIdx) => (
                     <div key={sIdx} className="flex items-center gap-1 rounded-lg border border-indigo-200 bg-white px-2 py-0.5 text-xs font-bold text-indigo-700 shadow-2xs">
                       <span>{spec}</span>
-                      <button
-                        type="button"
-                        onClick={() => setCfgSpecialists(prev => prev.filter((_, idx) => idx !== sIdx))}
-                        className="text-indigo-400 hover:text-indigo-700"
-                      >
-                        <XIcon size={11} />
-                      </button>
+                      {isAdminMode && (
+                        <button
+                          type="button"
+                          onClick={() => setCfgSpecialists(prev => prev.filter((_, idx) => idx !== sIdx))}
+                          className="text-indigo-400 hover:text-indigo-700"
+                        >
+                          <XIcon size={11} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSaveGradeConfig}
-                  className="w-full rounded-xl bg-indigo-600 py-2 text-xs font-bold text-white hover:bg-indigo-700 shadow-xs"
-                >
-                  [{editingConfigGrade}] 학급/전담 구성 저장
-                </button>
+                {isAdminMode && (
+                  <button
+                    type="button"
+                    onClick={handleSaveGradeConfig}
+                    className="w-full rounded-xl bg-indigo-600 py-2 text-xs font-bold text-white hover:bg-indigo-700 shadow-xs"
+                  >
+                    [{editingConfigGrade}] 학급/전담 구성 저장
+                  </button>
+                )}
               </div>
 
               {/* 학급별 비밀번호 변경 */}
               <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
-                <FieldLabel>학급별/전담별 비밀번호 설정</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel>학급별/전담별 비밀번호 설정</FieldLabel>
+                  {!isAdminMode && <span className="text-[10px] text-violet-600 font-bold">내 반 비밀번호만 변경 가능</span>}
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <FieldLabel>대상 학년</FieldLabel>
                     <select
                       value={selectedPwGrade}
+                      disabled={!isAdminMode}
                       onChange={(e) => { setSelectedPwGrade(e.target.value); setSelectedPwClass("1반"); }}
-                      className={inputCls}
+                      className={`${inputCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}
                     >
                       {gradesList.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
@@ -1844,8 +1931,9 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                     <FieldLabel>대상 학급/전담</FieldLabel>
                     <select
                       value={selectedPwClass}
+                      disabled={!isAdminMode}
                       onChange={(e) => setSelectedPwClass(e.target.value)}
-                      className={inputCls}
+                      className={`${inputCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}
                     >
                       {(() => {
                         const cfg = gradeConfigs[selectedPwGrade] || DEFAULT_CLASS_CONFIG;
