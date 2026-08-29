@@ -362,6 +362,7 @@ function App() {
     setIsNoticeEditing(true);
   };
 
+  // 표준 Fetch 기반 Supabase 통신 헬퍼 (CORS 및 404 에러 원천 차단)
   const sbFetch = async (table, method = 'GET', body = null, query = '') => {
     try {
       const url = `${SUPABASE_URL}/rest/v1/${table}${query}`;
