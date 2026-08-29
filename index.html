@@ -221,7 +221,7 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
             const isChecked = selectedEventIds.has(ev.id);
             const badgeLabel = ev.dept || "학습";
             const isGradeCommon = badgeLabel === "학년 공통";
-            const hasCustomTarget = isGradeCommon && ev.manager && ev.manager !== "전체";
+            const targetBadgeText = isGradeCommon ? (ev.manager && ev.manager !== "전체" ? ev.manager : "전체") : null;
 
             return (
               <div key={ev.id} className="flex items-center gap-2 group">
@@ -234,12 +234,16 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
                 />
                 <button onClick={() => onOpenEvent(ev)} className="flex flex-1 items-center gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-slate-100/85 transition min-w-0">
                   <Badge className={getTagStyle(badgeLabel)}>{badgeLabel}</Badge>
-                  {hasCustomTarget && (
+                  
+                  {/* 학년 공통 일정일 때 반/대상 표시 배지 (전체 또는 지정 반 목록) */}
+                  {targetBadgeText && (
                     <span className="rounded-md border border-violet-200 bg-violet-100/80 px-1.5 py-0.5 text-[11px] font-extrabold text-violet-800 shrink-0">
-                      {ev.manager}
+                      [{targetBadgeText}]
                     </span>
                   )}
+
                   <span className="pt-0.5 text-[13px] leading-snug text-slate-700 font-medium truncate">{ev.content}</span>
+
                   {!isGradeCommon && ev.manager && (
                     <span className="ml-auto shrink-0 pt-0.5 text-[13px] leading-snug text-slate-700 font-medium pl-2">
                       {ev.manager}
@@ -264,7 +268,6 @@ function App() {
   const [viewDate, setViewDate] = useState(new Date());
   const [weekAnchor, setWeekAnchor] = useState(new Date());
 
-  // 가변 학년 목록 상태 (관리자 모드에서 추가/삭제 가능)
   const [gradesList, setGradesList] = useState(() => {
     try {
       const saved = localStorage.getItem("sp_grade_list");
@@ -531,7 +534,6 @@ function App() {
     alert(`${editingConfigGrade}의 학급 및 전담 설정이 적용되었습니다.`);
   };
 
-  // 관리자 전용: 학년 추가 기능
   const handleAddGrade = async () => {
     if (!isAdminMode) return;
     const trimmed = newGradeInput.trim();
@@ -548,7 +550,6 @@ function App() {
     setGradesList(nextGrades);
     localStorage.setItem("sp_grade_list", JSON.stringify(nextGrades));
     
-    // 기본 학급 구성 등록
     const updatedConfigs = {
       ...gradeConfigs,
       [formatted]: DEFAULT_CLASS_CONFIG
@@ -567,7 +568,6 @@ function App() {
     alert(`'${formatted}'이(가) 추가되었습니다.`);
   };
 
-  // 관리자 전용: 학년 삭제 기능
   const handleDeleteGrade = async (gradeToDelete) => {
     if (!isAdminMode) return;
     if (gradesList.length <= 1) {
@@ -963,9 +963,10 @@ function App() {
     selectedTargets: [...activeClassList]
   });
 
+  // 학년 공통 상태(selectedClass가 null)일 때 기본 분야를 '학년 공통'으로 자동 지정
   const emptyForm = { 
     targetGrade: selectedGrade,
-    category: "학년 공통", 
+    category: selectedClass ? "학습" : "학년 공통", 
     content: "", 
     manager: "", 
     password: "",
@@ -1190,8 +1191,8 @@ function App() {
         evList.forEach(ev => {
           const badgeLabel = ev.dept || "학습";
           const isCommon = badgeLabel === "학년 공통";
-          const targetStr = isCommon && ev.manager && ev.manager !== "전체" ? ` (${ev.manager})` : "";
-          contents.push(`[${badgeLabel}] ${ev.content}${targetStr}`);
+          const targetStr = isCommon ? (ev.manager && ev.manager !== "전체" ? ` [${ev.manager}]` : " [전체]") : "";
+          contents.push(`[${badgeLabel}]${targetStr} ${ev.content}`);
           managers.push(!isCommon && ev.manager ? ev.manager : "-");
         });
         contentRaw = contents.join("\n");
@@ -1262,11 +1263,12 @@ function App() {
     const baseDate = dateStr || ymd(today);
     const defaultEnd = ymd(addMonths(new Date(baseDate), 1));
     const initialCycles = [{ date: baseDate }];
+    const autoCategory = selectedClass ? "학습" : "학년 공통";
 
     if (copiedEvent) {
       setForm({
         targetGrade: selectedGrade,
-        category: copiedEvent.category || "학년 공통",
+        category: copiedEvent.category || autoCategory,
         content: copiedEvent.content || "",
         manager: copiedEvent.manager || "",
         password: copiedEvent.password || "",
@@ -1279,6 +1281,7 @@ function App() {
       setForm({
         ...emptyForm,
         targetGrade: selectedGrade,
+        category: autoCategory,
         schedules: [defaultScheduleRow(baseDate)],
         repeatEndDate: defaultEnd,
         repeatCycles: initialCycles
@@ -1944,11 +1947,10 @@ function App() {
           </Modal>
         )}
 
-        {/* 학급 설정 및 비밀번호 관리 모달 (학년 추가/삭제 기능 추가) */}
+        {/* 학급 설정 및 비밀번호 관리 모달 */}
         {classConfigModalOpen && (
           <Modal title="학급 구성 및 환경/비밀번호 관리" onClose={() => setClassConfigModalOpen(false)} wide>
             <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-              
               {/* 0. 오늘의 행사 창 표시 위치 설정 */}
               <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-2">
                 <span className="text-xs font-extrabold text-slate-900 block">📌 오늘의 행사 표시 위치 설정</span>
@@ -1983,7 +1985,7 @@ function App() {
                 </div>
               </div>
 
-              {/* 1. 학년 및 학급/전담 구성 (관리자 모드 학년 추가/삭제 지원) */}
+              {/* 1. 학년 및 학급/전담 구성 */}
               <div className="rounded-2xl border border-violet-100 bg-violet-50/40 p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-extrabold text-violet-900 block">1. 학년 목록 및 학급/전담 구성</span>
@@ -2028,7 +2030,6 @@ function App() {
                     ))}
                   </div>
 
-                  {/* 관리자 전용 학년 추가 인풋 */}
                   {isAdminMode && (
                     <div className="flex items-center gap-1.5 pt-2">
                       <input
@@ -2288,7 +2289,7 @@ function App() {
             {deletePwError && <p className="mt-2 text-xs font-semibold text-rose-500">{deletePwError}</p>}
             <div className="mt-4 flex items-center gap-2">
               <button onClick={() => setDeleteModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
-              <button onClick={() => confirmBatchDelete(false)} className="flex-1 rounded-xl bg-rose-500 py-2.5 text-sm font-bold text-white hover:bg-rose-600 transition shadow-md shadow-rose-200">삭제 확인</button>
+              <button onClick={confirmBatchDelete} className="flex-1 rounded-xl bg-rose-500 py-2.5 text-sm font-bold text-white hover:bg-rose-600 transition shadow-md shadow-rose-200">삭제 확인</button>
             </div>
           </Modal>
         )}
