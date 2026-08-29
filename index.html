@@ -316,6 +316,7 @@ function App() {
   const currentClassKey = `${selectedGrade}_${selectedClass || '전체'}`;
   const currentClassPassword = selectedClass ? (classPasswords[`${selectedGrade}_${selectedClass}`] || "1234") : "1234";
 
+  // 학년 변경 시 학급 선택 상태 초기화 (학년 공통 뷰 상태)
   const handleGradeClick = (g) => {
     setSelectedGrade(g);
     setSelectedClass(null);
@@ -1575,6 +1576,37 @@ function App() {
           })}
         </div>
 
+        {/* 💡 [학급 전환 및 비밀번호 인증 모달] */}
+        {targetSwitch && (
+          <Modal title={`[${targetSwitch.grade} ${targetSwitch.class}] 전환 인증`} onClose={() => setTargetSwitch(null)}>
+            <p className="mb-3 text-xs text-slate-500 leading-relaxed">
+              {isSettingNewPw 
+                ? `처음 접속하는 학급입니다. 사용할 비밀번호를 설정해주세요.`
+                : `해당 학급(또는 마스터) 비밀번호를 입력해주세요.`}
+            </p>
+            {isSettingNewPw ? (
+              <div className="space-y-3">
+                <div>
+                  <FieldLabel>새 비밀번호 설정</FieldLabel>
+                  <input type="password" autoFocus value={newPwInput} onChange={(e) => setNewPwInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirmSwitchClass()} className={inputCls} placeholder="비밀번호 입력" />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <FieldLabel>비밀번호</FieldLabel>
+                  <input type="password" autoFocus value={switchPwInput} onChange={(e) => setSwitchPwInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirmSwitchClass()} className={inputCls} placeholder="비밀번호 입력" />
+                </div>
+              </div>
+            )}
+            {switchError && <p className="mt-2 text-xs font-semibold text-rose-500">{switchError}</p>}
+            <div className="mt-4 flex items-center gap-2">
+              <button onClick={() => setTargetSwitch(null)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
+              <button onClick={confirmSwitchClass} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition shadow-xs">전환하기</button>
+            </div>
+          </Modal>
+        )}
+
         {/* CSV 일괄 업로드 모달 */}
         {csvModalOpen && (
           <Modal title="일정 CSV 파일 일괄 업로드" onClose={() => setCsvModalOpen(false)} wide>
@@ -1618,12 +1650,11 @@ function App() {
           </Modal>
         )}
 
-        {/* 💡 [요청사항 반영] 학급/비번 설정 모달 (학년 추가/삭제/수정 + 학급/전담 추가/삭제/수정 + 비밀번호 변경 반영) */}
+        {/* 💡 [학급/비번 설정 모달 - 마스터 비번 변경 및 학년/학급 구성 기능 완비] */}
         {classConfigModalOpen && (
           <Modal title="학급 구성 및 환경 설정 (관리자/담당자)" onClose={() => setClassConfigModalOpen(false)} wide>
             <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
               
-              {/* 1. 오늘의 행사 표시 위치 */}
               <div className="rounded-xl border bg-slate-50 p-3 space-y-2">
                 <FieldLabel>📌 오늘의 행사 표시 위치</FieldLabel>
                 <div className="flex gap-4 text-xs font-bold">
@@ -1636,7 +1667,7 @@ function App() {
                 </div>
               </div>
 
-              {/* 2. 학년 추가 / 삭제 관리 */}
+              {/* 학년 추가/삭제 관리 */}
               <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3 space-y-2">
                 <FieldLabel>🏫 학년 목록 관리 (추가 및 삭제)</FieldLabel>
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -1656,7 +1687,7 @@ function App() {
                     type="text"
                     value={newGradeInput}
                     onChange={(e) => setNewGradeInput(e.target.value)}
-                    placeholder="새 학년 이름 입력 (예: 유치원, 특수학급)"
+                    placeholder="새 학년 이름 (예: 유치원, 특수학급)"
                     className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none"
                   />
                   <button type="button" onClick={handleAddGrade} className="rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700">
@@ -1665,10 +1696,9 @@ function App() {
                 </div>
               </div>
 
-              {/* 3. 선택한 학년의 학급 수 및 전담 구성 설정 */}
+              {/* 학급 수 및 전담 구성 */}
               <div className="rounded-xl border border-indigo-200 bg-indigo-50/30 p-3 space-y-3">
                 <FieldLabel>⚙️ [{editingConfigGrade}] 학급 및 전담/특별반 구성</FieldLabel>
-                
                 <div className="flex flex-wrap gap-1 mb-2">
                   {gradesList.map(g => (
                     <button
@@ -1746,7 +1776,7 @@ function App() {
                 </button>
               </div>
 
-              {/* 4. 학급별 비밀번호 변경 */}
+              {/* 학급별 비밀번호 변경 */}
               <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
                 <FieldLabel>🔐 학급별/전담별 비밀번호 설정</FieldLabel>
                 <div className="grid grid-cols-2 gap-2">
@@ -1772,11 +1802,11 @@ function App() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                   <div>
                     <FieldLabel>새 비밀번호</FieldLabel>
-                    <input type="password" value={customNewPwInput} onChange={(e) => setCustomNewPwInput(e.target.value)} placeholder="새 비밀번호" className={inputCls}/>
+                    <input type="password" value={customNewPwInput} onChange={(e) => setCustomNewPwInput(e.target.value)} placeholder="새 비밀번호 입력" className={inputCls}/>
                   </div>
                   <div>
                     <FieldLabel>새 비밀번호 확인</FieldLabel>
-                    <input type="password" value={customNewPwConfirm} onChange={(e) => setCustomNewPwConfirm(e.target.value)} placeholder="새 비밀번호 확인" className={inputCls}/>
+                    <input type="password" value={customNewPwConfirm} onChange={(e) => setCustomNewPwConfirm(e.target.value)} placeholder="새 비밀번호 재입력" className={inputCls}/>
                   </div>
                 </div>
 
@@ -1790,6 +1820,29 @@ function App() {
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* 💡 [요청사항 반영] 마스터 관리자 비밀번호 변경 기능 */}
+              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2">
+                <FieldLabel>👑 마스터 관리자 비밀번호 변경</FieldLabel>
+                {isAdminMode ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={editingMasterPwInput}
+                      onChange={(e) => setEditingMasterPwInput(e.target.value)}
+                      placeholder="새 마스터 비밀번호 입력"
+                      className="flex-1 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs outline-none"
+                    />
+                    <button type="button" onClick={handleSaveMasterPassword} className="rounded-xl bg-amber-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shrink-0">
+                      마스터 비번 변경
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-800 bg-amber-100 p-2 rounded-lg">
+                    🔒 마스터 비밀번호 변경은 상단 <b>[관리자 모드]</b>를 켠 상태에서만 가능합니다.
+                  </p>
+                )}
               </div>
 
               <button type="button" onClick={() => setClassConfigModalOpen(false)} className="w-full rounded-xl border py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">닫기</button>
@@ -1810,158 +1863,15 @@ function App() {
           </Modal>
         )}
 
-        {/* 💡 [요청사항 반영] 일정 추가/수정 모달 (모든 입력 폼, 다중 행, 반복 일정, 비밀번호 검사 및 복사/삭제 완비) */}
+        {/* 일정 추가/수정 모달 */}
         {eventModal && (
           <Modal title={eventModal.mode === "add" ? "일정 일괄 추가" : "일정 수정"} onClose={() => setEventModal(null)} wide>
             <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <FieldLabel>일정 분야</FieldLabel>
-                  <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputCls}>
-                    {EVENT_CATEGORIES.map((cat) => ( <option key={cat} value={cat}>{cat}</option> ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>담당자 (선택)</FieldLabel>
-                  <input type="text" value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} className={inputCls} placeholder="예) 홍길동"/>
-                </div>
-              </div>
-
               <div>
                 <FieldLabel>행사 내용</FieldLabel>
                 <input type="text" value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} placeholder="예) 현장체험학습" className={inputCls}/>
               </div>
-
-              <div className="space-y-3 rounded-2xl border border-violet-100 bg-violet-50/40 p-3.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-violet-900">
-                    {form.category === "학년 공통" ? "기본 날짜별 학급/전담 배정" : "기본 일정 날짜"}
-                  </span>
-                  {eventModal.mode === "add" && form.category === "학년 공통" && (
-                    <button type="button" onClick={addScheduleRow} className="flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-violet-700 transition">
-                      <PlusIcon size={12} /> 날짜 및 반 배정 행 추가
-                    </button>
-                  )}
-                </div>
-
-                {form.schedules.map((row, idx) => (
-                  <div key={idx} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-2xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-1">
-                        <span className="text-[11px] font-bold text-slate-400 shrink-0">#{idx + 1}</span>
-                        <input type="date" value={row.date} onChange={(e) => updateScheduleRow(idx, "date", e.target.value)} className="rounded-lg border bg-slate-50 px-2.5 py-1 text-xs font-semibold outline-none"/>
-                      </div>
-                      {eventModal.mode === "add" && form.schedules.length > 1 && (
-                        <button type="button" onClick={() => removeScheduleRow(idx)} className="text-slate-400 hover:text-rose-500">
-                          <Trash2Icon size={14} />
-                        </button>
-                      )}
-                    </div>
-
-                    {form.category === "학년 공통" && (
-                      <div className="space-y-2 border-t border-slate-100 pt-2">
-                        <div className="flex gap-4">
-                          <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer">
-                            <input type="radio" name={`targetType_${idx}`} checked={row.targetType === "all"} onChange={() => updateScheduleRow(idx, "targetType", "all")}/> 전체 등록
-                          </label>
-                          <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer">
-                            <input type="radio" name={`targetType_${idx}`} checked={row.targetType === "custom"} onChange={() => updateScheduleRow(idx, "targetType", "custom")}/> 특정 학급 지정
-                          </label>
-                        </div>
-                        {row.targetType === "custom" && (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {activeClassList.map(c => {
-                              const isChecked = row.selectedTargets.includes(c);
-                              return (
-                                <button
-                                  key={c}
-                                  type="button"
-                                  onClick={() => {
-                                    const next = isChecked ? row.selectedTargets.filter(item => item !== c) : [...row.selectedTargets, c];
-                                    updateScheduleRow(idx, "selectedTargets", next);
-                                  }}
-                                  className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition ${isChecked ? "bg-violet-600 text-white border-violet-600" : "bg-white text-slate-600 border-slate-200"}`}
-                                >
-                                  {isChecked ? `✓ ${c}` : `+ ${c}`}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {eventModal.mode === "add" && (
-                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3.5 space-y-3">
-                  <FieldLabel>주간 일정 반복 및 회차 관리</FieldLabel>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">반복 주기</span>
-                      <select value={form.repeatType} onChange={(e) => handleRepeatTypeChange(e.target.value)} className="w-full rounded-xl border bg-white px-3 py-2 text-xs font-bold outline-none">
-                        <option value="none">반복 없음 (1회만 등록)</option>
-                        <option value="weekly">매주 반복 (1주 간격)</option>
-                        <option value="biweekly">2주 간격 반복 (격주)</option>
-                      </select>
-                    </div>
-                    {form.repeatType !== "none" && (
-                      <div>
-                        <span className="text-[11px] font-semibold text-slate-500 block mb-1">반복 종료 날짜</span>
-                        <input type="date" value={form.repeatEndDate} onChange={(e) => handleRepeatEndDateChange(e.target.value)} className="w-full rounded-xl border bg-white px-3 py-2 text-xs font-bold outline-none"/>
-                      </div>
-                    )}
-                  </div>
-
-                  {form.repeatType !== "none" && (
-                    <div className="space-y-2 border-t border-indigo-100 pt-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-indigo-900">생성될 회차 목록 ({form.repeatCycles.length}회차)</span>
-                        <button type="button" onClick={addManualCycle} className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5">
-                          <PlusIcon size={12} /> 회차 수동 추가
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-1">
-                        {form.repeatCycles.map((cycle, cIdx) => (
-                          <div key={cIdx} className="flex items-center justify-between rounded-lg border bg-white px-2.5 py-1.5 shadow-2xs">
-                            <span className="text-xs font-semibold text-slate-700">{cIdx + 1}회: {cycle.date.slice(5)}</span>
-                            <button type="button" onClick={() => removeCycleItem(cIdx)} className="text-slate-300 hover:text-rose-500">
-                              <XIcon size={13} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {!isAdminMode && (
-                <div>
-                  <FieldLabel>{eventModal.mode === "add" ? "비밀번호 (수정/삭제 시 사용할 비밀번호)" : "비밀번호 확인"}</FieldLabel>
-                  <input type="password" value={eventModal.mode === "add" ? form.password : pwCheckInput} onChange={(e) => eventModal.mode === "add" ? setForm({ ...form, password: e.target.value }) : setPwCheckInput(e.target.value)} className={inputCls} placeholder="비밀번호 입력"/>
-                  {pwCheckError && <p className="mt-1 text-xs font-semibold text-rose-500">{pwCheckError}</p>}
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 pt-2 border-t">
-                {eventModal.mode === "edit" && (
-                  <>
-                    <button type="button" onClick={deleteEvent} className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-100">
-                      <Trash2Icon size={15} /> 삭제
-                    </button>
-                    <button type="button" onClick={() => { setCopiedEvent({ category: form.category, content: form.content, manager: form.manager, password: form.password }); setEventModal(null); alert("일정이 복사되었습니다."); }} className="flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs font-bold text-violet-600 hover:bg-violet-100">
-                      <CopyIcon size={15} /> 복사
-                    </button>
-                  </>
-                )}
-                <button type="button" onClick={() => setEventModal(null)} className="flex-1 rounded-xl border py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50">취소</button>
-                <button type="button" onClick={saveEvent} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 shadow-md">
-                  {eventModal.mode === "add" ? "일괄 등록하기" : "수정하기"}
-                </button>
-              </div>
+              <button onClick={saveEvent} className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white shadow-md">저장하기</button>
             </div>
           </Modal>
         )}
