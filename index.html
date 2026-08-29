@@ -407,7 +407,7 @@ function App() {
 
   const [events, setEvents] = useState([]);
 
-  // 다중 일정 및 반복 지원 입력 폼 기본 상태
+  // 기본 배정 행 템플릿
   const defaultScheduleRow = (dateStr) => ({
     date: dateStr || ymd(today),
     targetType: "all",
@@ -421,7 +421,8 @@ function App() {
     password: "",
     schedules: [defaultScheduleRow(ymd(today))],
     repeatType: "none", // none, weekly, biweekly
-    repeatCount: 1
+    repeatEndDate: ymd(addMonths(today, 1)), // 반복 종료 기준일
+    repeatCycles: [] // [{ date: '2026-08-08' }, ...]
   };
 
   const [eventModal, setEventModal] = useState(null);
@@ -651,8 +652,30 @@ function App() {
     else setWeekAnchor(new Date());
   };
 
+  // 종료 날짜 기준 반복 회차 자동 계산 헬퍼
+  const generateCycles = (baseDateStr, repeatType, endDateStr) => {
+    if (repeatType === "none" || !baseDateStr || !endDateStr) {
+      return [{ date: baseDateStr }];
+    }
+    const intervalDays = repeatType === "weekly" ? 7 : 14;
+    const start = new Date(baseDateStr);
+    const end = new Date(endDateStr);
+    const cycles = [];
+    let cur = new Date(start);
+
+    while (cur <= end) {
+      cycles.push({ date: ymd(cur) });
+      cur = addDays(cur, intervalDays);
+      if (cycles.length > 52) break; // 무한루프 방지
+    }
+    return cycles.length > 0 ? cycles : [{ date: baseDateStr }];
+  };
+
   const openAddEvent = (dateStr) => {
     const baseDate = dateStr || ymd(today);
+    const defaultEnd = ymd(addMonths(new Date(baseDate), 1));
+    const initialCycles = [{ date: baseDate }];
+
     if (copiedEvent) {
       setForm({
         category: copiedEvent.category || "학년 공통",
@@ -661,12 +684,15 @@ function App() {
         password: copiedEvent.password || "",
         schedules: [defaultScheduleRow(baseDate)],
         repeatType: "none",
-        repeatCount: 1
+        repeatEndDate: defaultEnd,
+        repeatCycles: initialCycles
       });
     } else {
       setForm({
         ...emptyForm,
-        schedules: [defaultScheduleRow(baseDate)]
+        schedules: [defaultScheduleRow(baseDate)],
+        repeatEndDate: defaultEnd,
+        repeatCycles: initialCycles
       });
     }
     setPwCheckInput("");
@@ -690,7 +716,8 @@ function App() {
         selectedTargets: isCustomTarget ? ev.manager.split(", ") : [...classList]
       }],
       repeatType: "none",
-      repeatCount: 1
+      repeatEndDate: ev.date,
+      repeatCycles: [{ date: ev.date }]
     });
     setPwCheckInput("");
     setPwCheckError("");
@@ -708,7 +735,7 @@ function App() {
     setEventModal(null);
   };
 
-  // 일정 행 추가 및 삭제
+  // 일정 행 추가/삭제/수정
   const addScheduleRow = () => {
     const lastRow = form.schedules[form.schedules.length - 1];
     const newDate = lastRow ? lastRow.date : ymd(today);
@@ -730,8 +757,58 @@ function App() {
     setForm(prev => {
       const nextSchedules = [...prev.schedules];
       nextSchedules[index] = { ...nextSchedules[index], [field]: value };
-      return { ...prev, schedules: nextSchedules };
+      
+      // 첫 행의 기준 날짜가 바뀌었을 때 반복 회차도 재계산
+      let nextCycles = prev.repeatCycles;
+      if (index === 0 && field === "date" && prev.repeatType !== "none") {
+        nextCycles = generateCycles(value, prev.repeatType, prev.repeatEndDate);
+      }
+      return { ...prev, schedules: nextSchedules, repeatCycles: nextCycles };
     });
+  };
+
+  // 반복 타입 변경
+  const handleRepeatTypeChange = (newType) => {
+    const baseDate = form.schedules[0]?.date || ymd(today);
+    const cycles = generateCycles(baseDate, newType, form.repeatEndDate);
+    setForm(prev => ({
+      ...prev,
+      repeatType: newType,
+      repeatCycles: cycles
+    }));
+  };
+
+  // 종료 날짜 변경
+  const handleRepeatEndDateChange = (newEndDate) => {
+    const baseDate = form.schedules[0]?.date || ymd(today);
+    const cycles = generateCycles(baseDate, form.repeatType, newEndDate);
+    setForm(prev => ({
+      ...prev,
+      repeatEndDate: newEndDate,
+      repeatCycles: cycles
+    }));
+  };
+
+  // 특정 회차 삭제
+  const removeCycleItem = (cycleIdx) => {
+    if (form.repeatCycles.length <= 1) {
+      alert("최소 1개 이상의 회차가 유지되어야 합니다.");
+      return;
+    }
+    setForm(prev => ({
+      ...prev,
+      repeatCycles: prev.repeatCycles.filter((_, idx) => idx !== cycleIdx)
+    }));
+  };
+
+  // 회차 수동 추가
+  const addManualCycle = () => {
+    const lastCycle = form.repeatCycles[form.repeatCycles.length - 1];
+    const nextDate = lastCycle ? ymd(addDays(new Date(lastCycle.date), 7)) : ymd(today);
+    setForm(prev => ({
+      ...prev,
+      repeatCycles: [...prev.repeatCycles, { date: nextDate }]
+    }));
   };
 
   const saveEvent = async () => {
@@ -744,14 +821,17 @@ function App() {
 
     if (eventModal.mode === "add") {
       const newEvents = [];
-      const repeatDays = form.repeatType === "weekly" ? 7 : form.repeatType === "biweekly" ? 14 : 0;
-      const count = form.repeatType === "none" ? 1 : Math.max(1, parseInt(form.repeatCount, 10) || 1);
+      const baseRowDate = new Date(form.schedules[0].date);
 
-      for (let r = 0; r < count; r++) {
+      // 계산된 각 반복 회차별로 날짜 offset 적용
+      for (const cycle of form.repeatCycles) {
+        const cycleDate = new Date(cycle.date);
+        const dayDiff = Math.round((cycleDate - baseRowDate) / (1000 * 60 * 60 * 24));
+
         for (const row of form.schedules) {
-          const baseDateObj = new Date(row.date);
-          const calculatedDateObj = addDays(baseDateObj, r * repeatDays);
-          const targetDateStr = ymd(calculatedDateObj);
+          const rowDate = new Date(row.date);
+          const targetDateObj = addDays(rowDate, dayDiff);
+          const targetDateStr = ymd(targetDateObj);
 
           let finalManager = form.manager;
           if (isGradeCommon) {
@@ -838,7 +918,7 @@ function App() {
           </div>
         )}
 
-        {/* 헤더 및 학년·반 선택 및 저장 바 */}
+        {/* 헤더 및 학년·반 선택 바 */}
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
@@ -857,7 +937,6 @@ function App() {
             </div>
           </div>
 
-          {/* 학년 및 반 선택 패널 및 저장 버튼 */}
           <div className="space-y-3 border-t border-slate-100 pt-3">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs font-bold text-slate-500 mr-2">학년 선택:</span>
@@ -1147,11 +1226,11 @@ function App() {
           </Modal>
         )}
 
-        {/* 일정 추가/수정 모달 (개선: 반별 분할 배정 및 주간 반복 지원) */}
+        {/* 일정 추가/수정 모달 */}
         {eventModal && (
           <Modal title={eventModal.mode === "add" ? "일정 일괄 추가" : "일정 수정"} onClose={() => setEventModal(null)} wide>
             <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-              {/* 분야 선택 */}
+              {/* 분야 및 담당자 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <FieldLabel>일정 분야</FieldLabel>
@@ -1187,7 +1266,7 @@ function App() {
               <div className="space-y-3 rounded-2xl border border-violet-100 bg-violet-50/40 p-3.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-extrabold text-violet-900">
-                    {form.category === "학년 공통" ? "날짜별 학급/전담 배정 목록" : "일정 날짜"}
+                    {form.category === "학년 공통" ? "기본 날짜별 학급/전담 배정" : "기본 일정 날짜"}
                   </span>
                   {eventModal.mode === "add" && form.category === "학년 공통" && (
                     <button
@@ -1277,40 +1356,80 @@ function App() {
                 ))}
               </div>
 
-              {/* 주 단위 일괄 반복 옵션 (추가 모드에서만 활성화) */}
+              {/* 주간 일정 날짜 기준 반복 및 회차별 삭제 지원 섹션 */}
               {eventModal.mode === "add" && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-                  <FieldLabel>주간 일정 일괄 반복 생성</FieldLabel>
-                  <div className="grid grid-cols-2 gap-2">
-                    <select 
-                      value={form.repeatType} 
-                      onChange={(e) => setForm({ ...form, repeatType: e.target.value })} 
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none"
-                    >
-                      <option value="none">반복 없음 (1회만 등록)</option>
-                      <option value="weekly">매주 반복 (다음 주, 다다음 주...)</option>
-                      <option value="biweekly">2주 간격 반복</option>
-                    </select>
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3.5 space-y-3">
+                  <FieldLabel>주간 일정 반복 및 회차 관리</FieldLabel>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[11px] font-semibold text-slate-500 block mb-1">반복 주기</span>
+                      <select 
+                        value={form.repeatType} 
+                        onChange={(e) => handleRepeatTypeChange(e.target.value)} 
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400"
+                      >
+                        <option value="none">반복 없음 (1회만 등록)</option>
+                        <option value="weekly">매주 반복 (1주 간격)</option>
+                        <option value="biweekly">2주 간격 반복 (격주)</option>
+                      </select>
+                    </div>
 
-                    {form.repeatType !== "none" ? (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-slate-500 shrink-0">총</span>
+                    {form.repeatType !== "none" && (
+                      <div>
+                        <span className="text-[11px] font-semibold text-slate-500 block mb-1">반복 종료 날짜</span>
                         <input 
-                          type="number" 
-                          min="1" 
-                          max="16" 
-                          value={form.repeatCount} 
-                          onChange={(e) => setForm({ ...form, repeatCount: e.target.value })} 
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none" 
+                          type="date" 
+                          value={form.repeatEndDate} 
+                          onChange={(e) => handleRepeatEndDateChange(e.target.value)} 
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" 
                         />
-                        <span className="text-xs font-bold text-slate-500 shrink-0">주 동안</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center text-[11px] text-slate-400 pl-1">
-                        * 다음 주 연속 수업 시 매주 반복을 선택하세요.
                       </div>
                     )}
                   </div>
+
+                  {/* 생성될 회차 목록 및 개별 삭제 UI */}
+                  {form.repeatType !== "none" && (
+                    <div className="space-y-2 border-t border-indigo-100 pt-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-indigo-900">
+                          생성될 회차 목록 ({form.repeatCycles.length}회차)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={addManualCycle}
+                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-0.5"
+                        >
+                          <PlusIcon size={12} /> 회차 수동 추가
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-1">
+                        {form.repeatCycles.map((cycle, cIdx) => {
+                          const cDate = new Date(cycle.date);
+                          const dow = WEEKDAY_KOR[cDate.getDay()];
+                          return (
+                            <div key={cIdx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 shadow-2xs">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 shrink-0">{cIdx + 1}회</span>
+                                <span className="text-xs font-semibold text-slate-700 truncate">{cycle.date.slice(5)} ({dow})</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeCycleItem(cIdx)}
+                                className="rounded p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition shrink-0 ml-1"
+                                title="이 회차 제외/삭제"
+                              >
+                                <XIcon size={13} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        * 방학, 공휴일, 재량휴업일 등 수업이 없는 회차는 오른쪽 [X] 버튼을 눌러 제외하세요.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
