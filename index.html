@@ -23,9 +23,25 @@ body { font-family: 'Inter', sans-serif; }
 
 <script type="text/babel">
 const SUPABASE_URL = "https://tygsgurwjpojzzrtyhrq.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzIyMzI2OH0.VR63l1j_PMhetS3pY3RsIT6G3sFFZZlZNjEg39dtn6s";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6InFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzIyMzI2OH0.VR63l1j_PMhetS3pY3RsIT6G3sFFZZlZNjEg39dtn6s";
 
 const { useState, useMemo, useEffect, useCallback, useRef } = React;
+
+const FIXED_HOLIDAYS = {
+  "01-01": "신정", "03-01": "삼일절", "05-05": "어린이날", "06-06": "현충일",
+  "08-15": "광복절", "10-03": "개천절", "10-09": "한글날", "12-25": "성탄절",
+  "2025-01-28": "설날 연휴", "2025-01-29": "설날", "2025-01-30": "설날 연휴",
+  "2025-03-03": "대체공휴일(삼일절)", "2025-05-06": "대체공휴일",
+  "2025-10-05": "추석 연휴", "2025-10-06": "추석", "2025-10-07": "추석 연휴", "2025-10-08": "대체공휴일",
+  "2026-02-16": "설날 연휴", "2026-02-17": "설날", "2026-02-18": "설날 연휴",
+  "2026-03-02": "대체공휴일(삼일절)", "2026-05-24": "부처님오신날", "2026-05-25": "대체공휴일",
+  "2026-08-17": "대체공휴일(광복절)", "2026-09-24": "추석 연휴", "2026-09-25": "추석",
+  "2026-09-26": "추석 연휴", "2026-10-05": "대체공휴일(개천절)",
+  "2027-02-06": "설날 연휴", "2027-02-07": "설날", "2027-02-08": "설날 연휴", "2027-02-09": "대체공휴일",
+  "2027-05-13": "부처님오신날", "2027-08-16": "대체공휴일(광복절)",
+  "2027-09-14": "추석 연휴", "2027-09-15": "추석", "2027-09-16": "추석 연휴",
+  "2027-10-04": "대체공휴일(개천절)", "2027-10-11": "대체공휴일(한글날)"
+};
 
 const INCHEON_SCHOOLS = {
   "서부교육지원청": [
@@ -163,8 +179,32 @@ const XIcon = ({ size = 16, className = "" }) => (
 const PlusIcon = ({ size = 14, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
 );
+const Trash2Icon = ({ size = 15, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+);
+const CopyIcon = ({ size = 15, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+);
+const PrinterIcon = ({ size = 14, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+);
+const CalendarDaysIcon = ({ size = 15, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+);
+const ClipboardListIcon = ({ size = 15, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>
+);
+const SettingsIcon = ({ size = 15, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+);
+const ShieldAlertIcon = ({ size = 15, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+);
 const SchoolIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 22v-4a2 2 0 1 0-4 0v4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M18 5v17"/><path d="m4 6 8-4 8 4"/><path d="M6 5v17"/><circle cx="12" cy="9" r="2"/></svg>
+);
+const UploadCloudIcon = ({ size = 15, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
 );
 
 function sortEvents(events) {
@@ -179,7 +219,7 @@ function sortEvents(events) {
   });
 }
 
-function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customHolidays }) {
+function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customHolidays, selectedEventIds, onToggleSelectEvent, onToggleSelectDate, isDateSelected }) {
   const dateStr = ymd(date);
   const dow = date.getDay();
   const isToday = sameDay(date, today);
@@ -193,6 +233,15 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
   return (
     <div className={`flex gap-3 border-b border-slate-100 px-3 py-2.5 sm:px-4 min-h-[52px] ${rowBg} ${isLast ? "border-b-0" : ""}`}>
       <div className={`flex w-16 shrink-0 flex-col items-start pt-0.5 sm:w-20 ${dateColor}`}>
+        <div className="flex items-center gap-1.5 mb-1">
+          <input
+            type="checkbox"
+            checked={isDateSelected}
+            onChange={() => onToggleSelectDate(dateStr, events)}
+            className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-400 cursor-pointer shrink-0"
+            title="이 날짜 전체 선택"
+          />
+        </div>
         <div className="flex items-center gap-1 text-sm font-extrabold">
           {date.getDate()}
           <span className="text-xs font-bold">({WEEKDAY_KOR[dow]})</span>
@@ -208,12 +257,33 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
           <p className="pt-0.5 text-xs text-slate-300">-</p>
         ) : (
           sortedEvents.map((ev) => {
+            const isChecked = selectedEventIds.has(ev.id);
             const badgeLabel = ev.dept || "학습";
+            const isGradeCommon = badgeLabel === "학년 공통";
+            const targetBadgeText = isGradeCommon ? (ev.manager && ev.manager !== "전체" ? ev.manager : "전체") : null;
+
             return (
-              <div key={ev.id} className="flex items-center gap-2">
+              <div key={ev.id} className="flex items-center gap-2 group">
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => onToggleSelectEvent(ev.id)}
+                  className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-400 cursor-pointer shrink-0"
+                  title="개별 일정 선택"
+                />
                 <button onClick={() => onOpenEvent(ev)} className="flex flex-1 items-center gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-slate-100/85 transition min-w-0">
                   <Badge className={getTagStyle(badgeLabel)}>{badgeLabel}</Badge>
+                  {targetBadgeText && (
+                    <span className="rounded-md border border-violet-200 bg-violet-100/80 px-1.5 py-0.5 text-[11px] font-extrabold text-violet-800 shrink-0">
+                      [{targetBadgeText}]
+                    </span>
+                  )}
                   <span className="pt-0.5 text-[13px] leading-snug text-slate-700 font-medium truncate">{ev.content}</span>
+                  {!isGradeCommon && ev.manager && (
+                    <span className="ml-auto shrink-0 pt-0.5 text-[13px] leading-snug text-slate-700 font-medium pl-2">
+                      {ev.manager}
+                    </span>
+                  )}
                 </button>
               </div>
             );
@@ -231,6 +301,7 @@ function App() {
   const today = new Date();
   const [tab, setTab] = useState("month");
   const [viewDate, setViewDate] = useState(new Date());
+  const [weekAnchor, setWeekAnchor] = useState(new Date());
 
   const [currentOffice, setCurrentOffice] = useState(() => localStorage.getItem("sp_office") || "서부교육지원청");
   const [currentSchool, setCurrentSchool] = useState(() => localStorage.getItem("sp_school") || "인천경연초등학교");
@@ -239,14 +310,196 @@ function App() {
   const [tempSchool, setTempSchool] = useState(currentSchool);
   const [schoolSearchQuery, setSchoolSearchQuery] = useState("");
 
-  const [gradesList, setGradesList] = useState(INITIAL_GRADES);
-  const [selectedGrade, setSelectedGrade] = useState("1학년");
-  const [selectedClass, setSelectedClass] = useState(null);
+  const [gradesList, setGradesList] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`sp_grade_list_${currentSchool}`);
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return INITIAL_GRADES;
+  });
 
-  const activeClassList = ["1반", "2반", "3반", "4반", "5반", "6반", "전담1", "전담2"];
+  const [selectedGrade, setSelectedGrade] = useState(() => localStorage.getItem(`sp_last_grade_${currentSchool}`) || (gradesList[0] || "1학년"));
+  const [selectedClass, setSelectedClass] = useState(() => localStorage.getItem(`sp_last_class_${currentSchool}`) || null);
 
-  const [events, setEvents] = useState([]);
-  const [customHolidays, setCustomHolidays] = useState({});
+  const [todayPosition, setTodayPosition] = useState(() => localStorage.getItem("sp_today_pos") || "header");
+
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [masterPassword, setMasterPassword] = useState(() => localStorage.getItem(`sp_master_pw_${currentSchool}`) || "admin1234");
+  const [adminAuthModalOpen, setAdminAuthModalOpen] = useState(false);
+  const [adminAuthPwInput, setAdminAuthPwInput] = useState("");
+  const [adminAuthError, setAdminAuthError] = useState("");
+
+  const [gradeConfigs, setGradeConfigs] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`sp_grade_configs_${currentSchool}`);
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    const init = {};
+    INITIAL_GRADES.forEach(g => { init[g] = { classCount: 6, specialists: ["전담1", "전담2"] }; });
+    return init;
+  });
+
+  const [classConfigModalOpen, setClassConfigModalOpen] = useState(false);
+  const [editingConfigGrade, setEditingConfigGrade] = useState(selectedGrade);
+  const [cfgClassCount, setCfgClassCount] = useState(6);
+  const [cfgSpecialists, setCfgSpecialists] = useState(["전담1", "전담2"]);
+  const [newSpecialistInput, setNewSpecialistInput] = useState("");
+  const [newGradeInput, setNewGradeInput] = useState("");
+
+  const [selectedPwGrade, setSelectedPwGrade] = useState(selectedGrade);
+  const [selectedPwClass, setSelectedPwClass] = useState("1반");
+  const [customNewPwInput, setCustomNewPwInput] = useState("");
+  const [customNewPwConfirm, setCustomNewPwConfirm] = useState("");
+  const [editingMasterPwInput, setEditingMasterPwInput] = useState("");
+
+  const activeClassList = useMemo(() => {
+    const cfg = gradeConfigs[selectedGrade] || DEFAULT_CLASS_CONFIG;
+    const classes = [];
+    for (let i = 1; i <= cfg.classCount; i++) classes.push(`${i}반`);
+    return [...classes, ...(cfg.specialists || [])];
+  }, [selectedGrade, gradeConfigs]);
+
+  const [classPasswords, setClassPasswords] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`sp_class_pw_${currentSchool}`)) || {}; } catch { return {}; }
+  });
+
+  const [targetSwitch, setTargetSwitch] = useState(null);
+  const [switchPwInput, setSwitchPwInput] = useState("");
+  const [switchError, setSwitchError] = useState("");
+  const [isSettingNewPw, setIsSettingNewPw] = useState(false);
+  const [newPwInput, setNewPwInput] = useState("");
+
+  const currentClassKey = `${selectedGrade}_${selectedClass || '전체'}`;
+  const currentClassPassword = selectedClass ? (classPasswords[`${selectedGrade}_${selectedClass}`] || "1234") : "1234";
+
+  const handleGradeClick = (g) => {
+    setSelectedGrade(g);
+    setSelectedClass(null);
+    localStorage.setItem(`sp_last_grade_${currentSchool}`, g);
+    localStorage.removeItem(`sp_last_class_${currentSchool}`);
+  };
+
+  const promptSwitchClass = (g, c) => {
+    if (g === selectedGrade && c === selectedClass) return;
+    if (isAdminMode) {
+      setSelectedGrade(g);
+      setSelectedClass(c);
+      localStorage.setItem(`sp_last_grade_${currentSchool}`, g);
+      localStorage.setItem(`sp_last_class_${currentSchool}`, c);
+      return;
+    }
+    const key = `${g}_${c}`;
+    const registeredPw = classPasswords[key];
+    setTargetSwitch({ grade: g, class: c });
+    setSwitchPwInput("");
+    setNewPwInput("");
+    setSwitchError("");
+    setIsSettingNewPw(!registeredPw);
+  };
+
+  const confirmSwitchClass = () => {
+    if (!targetSwitch) return;
+    const { grade, class: cls } = targetSwitch;
+    const key = `${grade}_${cls}`;
+    const registeredPw = classPasswords[key];
+
+    if (!registeredPw) {
+      if (!newPwInput.trim()) {
+        setSwitchError("새로 사용할 비밀번호를 입력해주세요.");
+        return;
+      }
+      const updated = { ...classPasswords, [key]: newPwInput.trim() };
+      setClassPasswords(updated);
+      localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(updated));
+      setSelectedGrade(grade);
+      setSelectedClass(cls);
+      localStorage.setItem(`sp_last_grade_${currentSchool}`, grade);
+      localStorage.setItem(`sp_last_class_${currentSchool}`, cls);
+      setTargetSwitch(null);
+      alert(`${grade} ${cls} 비밀번호가 설정되고 전환되었습니다.`);
+      return;
+    }
+
+    if (switchPwInput !== registeredPw && switchPwInput !== masterPassword) {
+      setSwitchError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+
+    setSelectedGrade(grade);
+    setSelectedClass(cls);
+    localStorage.setItem(`sp_last_grade_${currentSchool}`, grade);
+    localStorage.setItem(`sp_last_class_${currentSchool}`, cls);
+    setTargetSwitch(null);
+  };
+
+  const handleToggleAdminMode = () => {
+    if (isAdminMode) {
+      setIsAdminMode(false);
+      alert("관리자 모드가 해제되었습니다.");
+    } else {
+      setAdminAuthPwInput("");
+      setAdminAuthError("");
+      setAdminAuthModalOpen(true);
+    }
+  };
+
+  const confirmAdminAuth = () => {
+    if (adminAuthPwInput === masterPassword) {
+      setIsAdminMode(true);
+      setAdminAuthModalOpen(false);
+      alert("👑 관리자 모드로 전환되었습니다.");
+    } else {
+      setAdminAuthError("마스터 비밀번호가 일치하지 않습니다.");
+    }
+  };
+
+  const [copiedEvent, setCopiedEvent] = useState(null);
+  const [selectedEventIds, setSelectedEventIds] = useState(new Set());
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletePwInput, setDeletePwInput] = useState("");
+  const [deletePwError, setDeletePwError] = useState("");
+
+  const [customHolidays, setCustomHolidays] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`sp_holidays_${currentSchool}`)) || {}; } catch { return {}; }
+  });
+  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
+  const [holidayCalendarDate, setHolidayCalendarDate] = useState(new Date());
+  const [selectedHolidayDate, setSelectedHolidayDate] = useState(ymd(new Date()));
+  const [holidayNameInput, setHolidayNameInput] = useState("재량휴업일");
+
+  const [notices, setNotices] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`sp_notices_${currentSchool}`)) || {}; } catch { return {}; }
+  });
+
+  const getPeriodKey = (scopeType) => {
+    const period = tab === "month" ? `${viewDate.getFullYear()}-${pad2(viewDate.getMonth() + 1)}` : ymd(startOfWeekMon(weekAnchor));
+    if (scopeType === "grade") {
+      return `${currentSchool}_${selectedGrade}_COMMON_${period}`;
+    } else {
+      const cls = selectedClass || '1반';
+      return `${currentSchool}_${selectedGrade}_${cls}_${period}`;
+    }
+  };
+
+  const gradeNoticeKey = getPeriodKey("grade");
+  const classNoticeKey = getPeriodKey("class");
+
+  const [noticeModalOpen, setNoticeModalOpen] = useState(false);
+  const [noticeScope, setNoticeScope] = useState("grade");
+  const [modalNoticeText, setModalNoticeText] = useState("");
+
+  const openNoticeEditModal = () => {
+    const currentScope = selectedClass ? "class" : "grade";
+    setNoticeScope(currentScope);
+    const initialText = notices[getPeriodKey(currentScope)] || "";
+    setModalNoticeText(initialText);
+    setNoticeModalOpen(true);
+  };
+
+  const handleScopeChange = (newScope) => {
+    setNoticeScope(newScope);
+    setModalNoticeText(notices[getPeriodKey(newScope)] || "");
+  };
 
   const supabase = useMemo(() => {
     if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
@@ -255,76 +508,743 @@ function App() {
     return null;
   }, []);
 
+  const handleSaveNoticeModal = async () => {
+    const key = getPeriodKey(noticeScope);
+    const trimmed = modalNoticeText.trim();
+    const updated = { ...notices };
+    if (!trimmed) {
+      delete updated[key];
+    } else {
+      updated[key] = trimmed;
+    }
+    setNotices(updated);
+    setNoticeModalOpen(false);
+    localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(updated));
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: `notices_${currentSchool}`, data: updated }]);
+    }
+    alert("공지사항이 저장되었습니다.");
+  };
+
+  const handleDeleteNoticeModal = async () => {
+    const key = getPeriodKey(noticeScope);
+    const updated = { ...notices };
+    delete updated[key];
+    setNotices(updated);
+    setModalNoticeText("");
+    setNoticeModalOpen(false);
+    localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(updated));
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: `notices_${currentSchool}`, data: updated }]);
+    }
+    alert("공지사항이 삭제되었습니다.");
+  };
+
+  const openClassConfigModal = () => {
+    const currentTargetGrade = gradesList.includes(selectedGrade) ? selectedGrade : (gradesList[0] || "1학년");
+    setEditingConfigGrade(currentTargetGrade);
+    const cfg = gradeConfigs[currentTargetGrade] || DEFAULT_CLASS_CONFIG;
+    setCfgClassCount(cfg.classCount || 6);
+    setCfgSpecialists(cfg.specialists || ["전담1", "전담2"]);
+    setNewSpecialistInput("");
+    setNewGradeInput("");
+    setSelectedPwGrade(currentTargetGrade);
+    setSelectedPwClass("1반");
+    setCustomNewPwInput("");
+    setCustomNewPwConfirm("");
+    setEditingMasterPwInput(masterPassword);
+    setClassConfigModalOpen(true);
+  };
+
+  const handleSaveGradeConfig = async () => {
+    const updated = {
+      ...gradeConfigs,
+      [editingConfigGrade]: {
+        classCount: Math.max(1, parseInt(cfgClassCount, 10) || 1),
+        specialists: cfgSpecialists
+      }
+    };
+    setGradeConfigs(updated);
+    localStorage.setItem(`sp_grade_configs_${currentSchool}`, JSON.stringify(updated));
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: `configs_${currentSchool}`, data: updated }]);
+    }
+    alert(`${editingConfigGrade}의 학급 및 전담 설정이 적용되었습니다.`);
+  };
+
+  const handleAddGrade = async () => {
+    if (!isAdminMode) return;
+    const trimmed = newGradeInput.trim();
+    if (!trimmed) {
+      alert("추가할 학년 명칭을 입력해주세요.");
+      return;
+    }
+    const formatted = trimmed.includes("학년") || trimmed.includes("유치원") || trimmed.includes("반") ? trimmed : `${trimmed}학년`;
+    if (gradesList.includes(formatted)) {
+      alert("이미 존재하는 학년 명칭입니다.");
+      return;
+    }
+    const nextGrades = [...gradesList, formatted];
+    setGradesList(nextGrades);
+    localStorage.setItem(`sp_grade_list_${currentSchool}`, JSON.stringify(nextGrades));
+    
+    const updatedConfigs = {
+      ...gradeConfigs,
+      [formatted]: DEFAULT_CLASS_CONFIG
+    };
+    setGradeConfigs(updatedConfigs);
+    localStorage.setItem(`sp_grade_configs_${currentSchool}`, JSON.stringify(updatedConfigs));
+
+    if (supabase) {
+      await supabase.from('admin_status').upsert([
+        { week_key: `grades_${currentSchool}`, data: nextGrades },
+        { week_key: `configs_${currentSchool}`, data: updatedConfigs }
+      ]);
+    }
+    setNewGradeInput("");
+    setEditingConfigGrade(formatted);
+    alert(`'${formatted}'이(가) 추가되었습니다.`);
+  };
+
+  const handleDeleteGrade = async (gradeToDelete) => {
+    if (!isAdminMode) return;
+    if (gradesList.length <= 1) {
+      alert("최소 1개 이상의 학년이 유지되어야 합니다.");
+      return;
+    }
+    if (!confirm(`'${gradeToDelete}'을(를) 학년 목록에서 삭제하시겠습니까?`)) return;
+
+    const nextGrades = gradesList.filter(g => g !== gradeToDelete);
+    setGradesList(nextGrades);
+    localStorage.setItem(`sp_grade_list_${currentSchool}`, JSON.stringify(nextGrades));
+
+    if (selectedGrade === gradeToDelete) {
+      setSelectedGrade(nextGrades[0]);
+      localStorage.setItem(`sp_last_grade_${currentSchool}`, nextGrades[0]);
+    }
+    if (editingConfigGrade === gradeToDelete) {
+      setEditingConfigGrade(nextGrades[0]);
+    }
+
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: `grades_${currentSchool}`, data: nextGrades }]);
+    }
+    alert(`'${gradeToDelete}'이(가) 삭제되었습니다.`);
+  };
+
+  const handleUpdateTodayPosition = async (newPos) => {
+    setTodayPosition(newPos);
+    localStorage.setItem("sp_today_pos", newPos);
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: 'today_pos_setting', data: { pos: newPos } }]);
+    }
+  };
+
+  const handleChangeClassPw = async () => {
+    const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
+    const newPw = customNewPwInput.trim();
+    const confirmPw = customNewPwConfirm.trim();
+
+    if (!newPw) {
+      alert("새 비밀번호를 입력해주세요.");
+      return;
+    }
+    if (newPw !== confirmPw) {
+      alert("새 비밀번호와 비밀번호 확인이 일치하지 않습니다. 다시 확인해주세요.");
+      return;
+    }
+
+    const updated = { ...classPasswords, [targetKey]: newPw };
+    setClassPasswords(updated);
+    localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(updated));
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: `class_pw_${currentSchool}`, data: updated }]);
+    }
+    setCustomNewPwInput("");
+    setCustomNewPwConfirm("");
+    alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 성공적으로 변경되었습니다.`);
+  };
+
+  const handleAdminResetClassPw = async () => {
+    if (!isAdminMode) {
+      alert("비밀번호 초기화는 관리자 모드에서만 가능합니다.");
+      return;
+    }
+    const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
+    const updated = { ...classPasswords, [targetKey]: "1234" };
+    setClassPasswords(updated);
+    localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(updated));
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: `class_pw_${currentSchool}`, data: updated }]);
+    }
+    setCustomNewPwInput("");
+    setCustomNewPwConfirm("");
+    alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 기본값 '1234'로 초기화되었습니다.`);
+  };
+
+  const handleSaveMasterPassword = async () => {
+    if (!isAdminMode) {
+      alert("마스터 비밀번호 변경은 관리자 모드에서만 가능합니다.");
+      return;
+    }
+    const trimmed = editingMasterPwInput.trim();
+    if (!trimmed) {
+      alert("마스터 비밀번호를 입력해주세요.");
+      return;
+    }
+    setMasterPassword(trimmed);
+    localStorage.setItem(`sp_master_pw_${currentSchool}`, trimmed);
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: `master_pw_${currentSchool}`, data: { password: trimmed } }]);
+    }
+    alert(`마스터 관리자 비밀번호가 성공적으로 변경되었습니다.`);
+  };
+
+  const [events, setEvents] = useState([]);
+
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [csvParsedData, setCsvParsedData] = useState([]);
+  const [csvFileName, setCsvFileName] = useState("");
+  const [csvError, setCsvError] = useState("");
+
+  const downloadCsvTemplate = () => {
+    const xmlTemplate = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="Header">
+   <Font ss:FontName="맑은 고딕" ss:Size="11" ss:Bold="1"/>
+   <Interior ss:Color="#F3F4F6" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="Data">
+   <Font ss:FontName="맑은 고딕" ss:Size="10"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="DataLeft">
+   <Font ss:FontName="맑은 고딕" ss:Size="10"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+   </Borders>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="일정업로드양식">
+  <Table>
+   <Column ss:Width="112.5"/>
+   <Column ss:Width="60"/>
+   <Column ss:Width="112.5"/>
+   <Column ss:Width="300"/>
+   <Column ss:Width="90"/>
+   <Column ss:Width="75"/>
+   <Column ss:Width="75"/>
+   <Row ss:Height="24">
+    <Cell ss:StyleID="Header"><Data ss:Type="String">날짜(YYYY-MM-DD)</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">학년</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">학급</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">행사내용</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">일정분야</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">담당자</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">비밀번호</Data></Cell>
+   </Row>
+   <Row ss:Height="20">
+    <Cell ss:StyleID="Data"><Data ss:Type="String">2026-09-01</Data></Cell>
+    <Cell ss:StyleID="Data"><Data ss:Type="String">1</Data></Cell>
+    <Cell ss:StyleID="Data"><Data ss:Type="String">1</Data></Cell>
+    <Cell ss:StyleID="DataLeft"><Data ss:Type="String">입학식 및 시업식</Data></Cell>
+    <Cell ss:StyleID="Data"><Data ss:Type="String">학습</Data></Cell>
+    <Cell ss:StyleID="Data"><Data ss:Type="String">홍길동</Data></Cell>
+    <Cell ss:StyleID="Data"><Data ss:Type="String">1234</Data></Cell>
+   </Row>
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+    const blob = new Blob([xmlTemplate], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", "학급행사_일괄업로드_양식.xls");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const parseCsvLine = (text) => {
+    const result = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (c === '"') {
+        if (inQuotes && text[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (c === ',' && !inQuotes) {
+        result.push(cur.trim());
+        cur = "";
+      } else {
+        cur += c;
+      }
+    }
+    result.push(cur.trim());
+    return result;
+  };
+
+  const parseGradeStr = (raw) => {
+    if (!raw) return selectedGrade;
+    const match = String(raw).match(/\d+/);
+    if (match) return `${match[0]}학년`;
+    return raw.includes("학년") ? raw : `${raw}학년`;
+  };
+
+  const parseClassStr = (raw) => {
+    if (!raw) return { dept: "학년 공통", manager: "전체", category: "학년 공통" };
+    const str = String(raw).trim();
+    if (str === "전체" || str === "공통" || str === "학년 공통" || str === "") {
+      return { dept: "학년 공통", manager: "전체", category: "학년 공통" };
+    }
+
+    if (!/\d/.test(str)) {
+      return { dept: str, manager: "", category: "학습" };
+    }
+
+    const digits = str.replace(/[^\d]/g, '').split('').filter(Boolean);
+    if (digits.length === 1) {
+      return { dept: `${digits[0]}반`, manager: "", category: "학습" };
+    } else if (digits.length > 1) {
+      const uniqueDigits = Array.from(new Set(digits)).sort((a, b) => a - b);
+      const classListFormatted = uniqueDigits.map(d => `${d}반`).join(", ");
+      return { dept: "학년 공통", manager: classListFormatted, category: "학년 공통" };
+    }
+
+    return { dept: str, manager: "", category: "학습" };
+  };
+
+  const handleCsvFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setCsvFileName(file.name);
+    setCsvError("");
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target.result;
+        
+        if (text.includes("<?xml") || text.includes("<Workbook")) {
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(text, "text/xml");
+          const rows = xmlDoc.getElementsByTagName("Row");
+          const parsed = [];
+          
+          for (let i = 0; i < rows.length; i++) {
+            const cells = rows[i].getElementsByTagName("Cell");
+            const cols = [];
+            for (let j = 0; j < cells.length; j++) {
+              cols.push(cells[j].textContent ? cells[j].textContent.trim() : "");
+            }
+            if (cols.length === 0 || cols[0].includes("날짜") || cols[0].includes("YYYY")) continue;
+            if (!cols[0] || !cols[3]) continue;
+
+            const formattedGrade = parseGradeStr(cols[1]);
+            const classInfo = parseClassStr(cols[2]);
+            const eventContent = cols[3];
+            const eventCategory = cols[4] || classInfo.category || "학습";
+            const eventManager = cols[5] ? cols[5] : (classInfo.manager || "");
+            const eventPw = cols[6] || "1234";
+
+            parsed.push({
+              id: Math.floor(Date.now() + Math.random() * 1000000 + i) % 2147483647,
+              date: cols[0].replace(/[./]/g, '-'),
+              grade: formattedGrade,
+              dept: classInfo.dept,
+              content: eventContent,
+              category: eventCategory,
+              manager: eventManager,
+              password: eventPw
+            });
+          }
+
+          if (parsed.length === 0) {
+            setCsvError("일정 데이터를 파싱하지 못했습니다. 파일 내용을 확인해 주세요.");
+          } else {
+            setCsvParsedData(parsed);
+          }
+          return;
+        }
+
+        const lines = text.split(/\r\n|\n/).map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length <= 1) {
+          setCsvError("업로드한 파일에 유효한 데이터 행이 존재하지 않습니다.");
+          return;
+        }
+
+        const parsed = [];
+        for (let i = 0; i < lines.length; i++) {
+          const cols = parseCsvLine(lines[i]);
+          if (cols[0].includes("날짜") || cols[0].includes("YYYY")) continue;
+          if (!cols[0] || !cols[3]) continue;
+
+          const formattedGrade = parseGradeStr(cols[1]);
+          const classInfo = parseClassStr(cols[2]);
+          const eventContent = cols[3];
+          const eventCategory = cols[4] || classInfo.category || "학습";
+          const eventManager = cols[5] ? cols[5] : (classInfo.manager || "");
+          const eventPw = cols[6] || "1234";
+
+          parsed.push({
+            id: Math.floor(Date.now() + Math.random() * 1000000 + i) % 2147483647,
+            date: cols[0].replace(/[./]/g, '-'),
+            grade: formattedGrade,
+            dept: classInfo.dept,
+            content: eventContent,
+            category: eventCategory,
+            manager: eventManager,
+            password: eventPw
+          });
+        }
+
+        if (parsed.length === 0) {
+          setCsvError("일정 데이터를 파싱하지 못했습니다. CSV 형식(날짜, 학년, 학급, 내용)을 확인해 주세요.");
+        } else {
+          setCsvParsedData(parsed);
+        }
+      } catch (err) {
+        setCsvError("파일 분석 중 오류가 발생했습니다: " + err.message);
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
+  const handleConfirmBatchUpload = async () => {
+    if (csvParsedData.length === 0) {
+      alert("업로드할 유효한 일정이 없습니다.");
+      return;
+    }
+
+    if (supabase) {
+      const { error } = await supabase.from('events').insert(csvParsedData);
+      if (error) {
+        alert("일괄 업로드 실패: " + error.message);
+        return;
+      }
+    }
+
+    setEvents(prev => [...prev, ...csvParsedData]);
+    setCsvModalOpen(false);
+    setCsvParsedData([]);
+    setCsvFileName("");
+    alert(`총 ${csvParsedData.length}건의 일정이 성공적으로 일괄 등록되었습니다!`);
+  };
+
+  const defaultScheduleRow = (dateStr) => ({
+    date: dateStr || ymd(today),
+    targetType: "all",
+    selectedTargets: [...activeClassList]
+  });
+
+  const emptyForm = { 
+    targetGrade: selectedGrade,
+    category: selectedClass ? "학습" : "학년 공통", 
+    content: "", 
+    manager: "", 
+    password: "",
+    schedules: [defaultScheduleRow(ymd(today))],
+    repeatType: "none",
+    repeatEndDate: ymd(addMonths(today, 1)),
+    repeatCycles: []
+  };
+
+  const [eventModal, setEventModal] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [pwCheckInput, setPwCheckInput] = useState("");
+  const [pwCheckError, setPwCheckError] = useState("");
+
   const fetchAllData = useCallback(async () => {
     if (!supabase) return;
     try {
       const { data: dbEvents } = await supabase.from('events').select('*').eq('school_name', currentSchool);
       if (dbEvents) setEvents(dbEvents);
     } catch(e) {}
+    try {
+      const { data: dbAdmin } = await supabase.from('admin_status').select('*');
+      if (dbAdmin) {
+        dbAdmin.forEach(item => {
+          if (item.week_key === `holidays_${currentSchool}`) {
+            setCustomHolidays(item.data || {});
+            localStorage.setItem(`sp_holidays_${currentSchool}`, JSON.stringify(item.data || {}));
+          } else if (item.week_key === `notices_${currentSchool}`) {
+            setNotices(item.data || {});
+            localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(item.data || {}));
+          } else if (item.week_key === `configs_${currentSchool}`) {
+            setGradeConfigs(item.data || {});
+            localStorage.setItem(`sp_grade_configs_${currentSchool}`, JSON.stringify(item.data || {}));
+          } else if (item.week_key === `grades_${currentSchool}`) {
+            if (Array.isArray(item.data)) {
+              setGradesList(item.data);
+              localStorage.setItem(`sp_grade_list_${currentSchool}`, JSON.stringify(item.data));
+            }
+          } else if (item.week_key === `master_pw_${currentSchool}`) {
+            if (item.data && item.data.password) {
+              setMasterPassword(item.data.password);
+              localStorage.setItem(`sp_master_pw_${currentSchool}`, item.data.password);
+            }
+          } else if (item.week_key === 'today_pos_setting') {
+            if (item.data && item.data.pos) {
+              setTodayPosition(item.data.pos);
+              localStorage.setItem("sp_today_pos", item.data.pos);
+            }
+          }
+        });
+      }
+    } catch(e) {}
   }, [supabase, currentSchool]);
 
   useEffect(() => {
     fetchAllData();
-  }, [fetchAllData]);
-
-  const handleApplySchoolChange = (newOffice, newSch) => {
-    setCurrentOffice(newOffice);
-    setCurrentSchool(newSch);
-    localStorage.setItem("sp_office", newOffice);
-    localStorage.setItem("sp_school", newSch);
-    setSelectedClass(null);
-    setSchoolModalOpen(false);
-  };
+    if (!supabase) return;
+    const timer = setInterval(fetchAllData, 5000);
+    return () => clearInterval(timer);
+  }, [supabase, fetchAllData]);
 
   const filteredEvents = useMemo(() => {
-    return events.filter((e) => e.grade === selectedGrade);
-  }, [events, selectedGrade]);
+    return events.filter((e) => {
+      if (e.grade !== selectedGrade) return false;
+      const cat = e.dept || "학습";
+      if (cat === "학년 공통") {
+        if (!selectedClass) return true;
+        if (!e.manager || e.manager === "전체") return true;
+        return e.manager.includes(selectedClass);
+      }
+      return selectedClass ? e.dept === selectedClass : false;
+    });
+  }, [events, selectedGrade, selectedClass]);
 
   const eventsByDate = useMemo(() => {
     const map = {};
     filteredEvents.forEach((e) => {
       if (!map[e.date]) map[e.date] = [];
-      map[e.date].push(e);
+      const isDuplicate = map[e.date].some(item => item.id === e.id);
+      if (!isDuplicate) map[e.date].push(e);
     });
     return map;
   }, [filteredEvents]);
 
+  const todayStr = ymd(today);
+  const todayEvents = useMemo(() => sortEvents(eventsByDate[todayStr] || []), [eventsByDate, todayStr]);
+
   const monthDays = getMonthDays(viewDate);
   const monthLabel = `${viewDate.getFullYear()}년 ${viewDate.getMonth() + 1}월`;
+  const weekDates = getWeekdays(weekAnchor);
+  const weekStart = weekDates[0];
+  const weekEnd = weekDates[4];
+  const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} ~ ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
 
-  const [eventModal, setEventModal] = useState(null);
-  const [form, setForm] = useState({ content: "", date: ymd(today) });
-
-  const openAddEvent = (dateStr) => {
-    setForm({ content: "", date: dateStr || ymd(today) });
-    setEventModal(true);
+  const [selectedEventIds, setSelectedEventIds] = useState(new Set());
+  const handleToggleSelectEvent = (id) => {
+    setSelectedEventIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
-  const saveEvent = async () => {
-    if (!form.content.trim()) return;
-    const newEv = {
-      id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
-      school_name: currentSchool,
-      date: form.date,
-      grade: selectedGrade,
-      dept: "학습",
-      content: form.content,
-      manager: "교사",
-      password: "1234"
+  const handleToggleSelectDate = (dateStr, dateEvents) => {
+    const evIds = dateEvents.map(e => e.id);
+    if (evIds.length === 0) return;
+    const allChecked = evIds.every(id => selectedEventIds.has(id));
+    setSelectedEventIds(prev => {
+      const next = new Set(prev);
+      evIds.forEach(id => { if (allChecked) next.delete(id); else next.add(id); });
+      return next;
+    });
+  };
+
+  const openDeleteModal = () => {
+    if (selectedEventIds.size === 0) {
+      alert("삭제할 일정을 체크박스로 선택해주세요.");
+      return;
+    }
+    if (isAdminMode) {
+      if (confirm(`관리자 권한으로 선택한 ${selectedEventIds.size}개의 일정을 즉시 삭제하시겠습니까?`)) {
+        confirmBatchDelete(true);
+      }
+      return;
+    }
+    setDeletePwInput("");
+    setDeletePwError("");
+    setDeleteModalOpen(true);
+  };
+
+  const confirmBatchDelete = async (forceAdmin = false) => {
+    if (!forceAdmin && !isAdminMode && deletePwInput !== currentClassPassword && deletePwInput !== masterPassword) {
+      setDeletePwError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+
+    const idsArr = Array.from(selectedEventIds);
+    if (supabase) {
+      await supabase.from('events').delete().in('id', idsArr);
+    }
+    setEvents(prev => prev.filter(ev => !selectedEventIds.has(ev.id)));
+    setSelectedEventIds(new Set());
+    setDeleteModalOpen(false);
+    alert("선택한 일정이 안전하게 삭제되었습니다.");
+  };
+
+  const handlePrint = () => {
+    const isMonth = tab === "month";
+    const activeDays = isMonth ? monthDays : weekDates;
+    const gNotice = (notices[gradeNoticeKey] || "").trim();
+    const cNotice = (notices[classNoticeKey] || "").trim();
+
+    const escapeToExcelCell = (str) => {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/\r\n|\n|\r/g, '<br style="mso-data-placement:same-cell;" />');
     };
 
-    if (supabase) {
-      await supabase.from('events').insert([newEv]);
+    let htmlTableContent = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:x="urn:schemas-microsoft-com:office:excel"
+            xmlns="http://www.w3.org/1999/xhtml">
+      <head>
+        <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+        <style>
+          table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+          th, td { border: 0.5pt solid #999; padding: 6px; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; font-size: 11pt; vertical-align: middle; mso-data-placement: same-cell; white-space: pre-wrap; }
+          th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
+          .title { font-size: 16pt; font-weight: bold; text-align: center; border: none; padding-bottom: 15px; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr><td colspan="4" class="title">${selectedGrade} ${selectedClass || '전체 공통'} ${isMonth ? `${monthLabel} 행사 일정표` : `주간 행사 계획 (${weekLabel})`}</td></tr>
+          <tr>
+            <th style="width: 50px;">일자</th>
+            <th style="width: 50px;">요일</th>
+            <th style="width: 550px;">내용</th>
+            <th style="width: 100px;">담당자</th>
+          </tr>
+    `;
+
+    activeDays.forEach(d => {
+      const dayNum = d.getDate();
+      const dowStr = WEEKDAY_KOR[d.getDay()];
+      const dStr = ymd(d);
+      const hol = getHolidayName(dStr, customHolidays) || "";
+      const evList = sortEvents(eventsByDate[dStr] || []);
+
+      let contentRaw = "";
+      let managerRaw = "";
+
+      if (evList.length === 0) {
+        contentRaw = hol ? `[휴일] ${hol}` : "";
+        managerRaw = "";
+      } else {
+        const contents = [];
+        const managers = [];
+        evList.forEach(ev => {
+          const badgeLabel = ev.dept || "학습";
+          const isCommon = badgeLabel === "학년 공통";
+          const targetStr = isCommon ? (ev.manager && ev.manager !== "전체" ? ` [${ev.manager}]` : " [전체]") : "";
+          contents.push(`[${badgeLabel}]${targetStr} ${ev.content}`);
+          managers.push(!isCommon && ev.manager ? ev.manager : "-");
+        });
+        contentRaw = contents.join("\n");
+        managerRaw = managers.join("\n");
+      }
+
+      htmlTableContent += `
+          <tr>
+            <td style="text-align: center;">${dayNum}</td>
+            <td style="text-align: center;">${dowStr}</td>
+            <td>${escapeToExcelCell(contentRaw)}</td>
+            <td style="text-align: center;">${escapeToExcelCell(managerRaw)}</td>
+          </tr>
+      `;
+    });
+
+    if (gNotice || cNotice) {
+      const combinedNotices = [
+        gNotice ? `[학년 공통]\n${gNotice}` : "",
+        cNotice ? `[학급/전담]\n${cNotice}` : ""
+      ].filter(Boolean).join("\n\n");
+
+      htmlTableContent += `
+          <tr>
+            <td colspan="2" style="text-align: center; font-weight: bold; background-color: #f9fafb;">공지 및 협의</td>
+            <td colspan="2">${escapeToExcelCell(combinedNotices)}</td>
+          </tr>
+      `;
     }
-    setEvents(prev => [...prev, newEv]);
-    setEventModal(false);
-    alert("일정이 저장되었습니다.");
+
+    htmlTableContent += `</table></body></html>`;
+
+    const blob = new Blob(["\uFEFF" + htmlTableContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", `${selectedGrade}_${selectedClass || '공통'}_학급행사관리.xls`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const goPrev = () => (tab === "month" ? setViewDate((d) => addMonths(d, -1)) : setWeekAnchor((d) => addDays(d, -7)));
+  const goNext = () => (tab === "month" ? setViewDate((d) => addMonths(d, 1)) : setWeekAnchor((d) => addDays(d, 7)));
+  const goToday = () => {
+    if (tab === "month") setViewDate(new Date()); else setWeekAnchor(new Date());
   };
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-violet-50 via-white to-white p-4 pb-32 sm:p-6 sm:pb-36">
       <div className="mx-auto max-w-3xl">
         
+        {isAdminMode && (
+          <div className="mb-4 flex items-center justify-between rounded-2xl bg-amber-500 px-4 py-2.5 text-white shadow-lg shadow-amber-200">
+            <div className="flex items-center gap-2 text-xs font-bold truncate">
+              <span className="rounded-lg bg-amber-700 px-2 py-0.5 shrink-0">MASTER ADMIN ON</span>
+              <span className="truncate font-medium">관리자 모드 활성화됨: 모든 학년/학급 일정을 비밀번호 없이 관리할 수 있습니다.</span>
+            </div>
+            <button onClick={handleToggleAdminMode} className="ml-2 shrink-0 rounded-lg bg-amber-700 px-2.5 py-1 text-xs font-bold hover:bg-amber-800 transition">종료</button>
+          </div>
+        )}
+
+        {copiedEvent && (
+          <div className="mb-4 flex items-center justify-between rounded-xl bg-violet-600 px-4 py-2.5 text-white shadow-lg shadow-violet-200">
+            <div className="flex items-center gap-2 text-xs truncate">
+              <span className="rounded bg-violet-800 px-1.5 py-0.5 font-bold shrink-0">복사됨</span>
+              <span className="truncate font-medium">"{copiedEvent.content}" (원하는 날짜의 '+' 버튼을 눌러 붙여넣기하세요)</span>
+            </div>
+            <button onClick={() => setCopiedEvent(null)} className="ml-2 shrink-0 rounded-lg bg-violet-700 px-2 py-0.5 text-xs hover:bg-violet-800">해제</button>
+          </div>
+        )}
+
         {/* 상단 학교 선택 바 */}
         <div className="mb-3 flex items-center justify-between rounded-xl bg-violet-900 px-4 py-2.5 text-white shadow-md">
           <div className="flex items-center gap-2 text-xs font-bold truncate">
@@ -340,54 +1260,200 @@ function App() {
           </button>
         </div>
 
-        {/* 헤더 */}
+        {/* 메인 헤더 패널 */}
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <h1 className="text-xl font-extrabold text-slate-900 sm:text-2xl mb-2">
-            [{selectedGrade}] 인천광역시 초등 행사 플래너
-          </h1>
-          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
-            <span className="text-xs font-bold text-slate-500 mr-2 self-center">학년 선택:</span>
-            {gradesList.map(g => (
-              <button
-                key={g}
-                onClick={() => setSelectedGrade(g)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${selectedGrade === g ? "bg-violet-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-              >
-                {g}
-              </button>
-            ))}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-extrabold text-slate-900 sm:text-2xl whitespace-nowrap overflow-hidden text-ellipsis mb-1">
+                [{selectedGrade} {selectedClass ? selectedClass : "공통"}] 학급 및 전담 행사 관리 플래너
+              </h1>
+              <p className="text-xs text-slate-400">
+                {selectedClass ? "학급 전용 일정 페이지입니다." : "학년 공통 뷰입니다. 특정 학급 버튼을 눌러 개별 반으로 이동하세요."}
+              </p>
+            </div>
+
+            {todayPosition === "header" && (
+              <div className="shrink-0 flex flex-col items-start md:items-end justify-center rounded-xl bg-gradient-to-br from-violet-50 to-indigo-50/70 border border-violet-100 p-2.5 min-w-[200px] shadow-2xs">
+                <div className="flex items-center gap-1.5 text-xs font-black text-violet-700 mb-1">
+                  <span>📢</span>
+                  <span>오늘의 행사 ({today.getMonth() + 1}/{today.getDate()} {WEEKDAY_KOR[today.getDay()]})</span>
+                </div>
+                {todayEvents.length === 0 ? (
+                  <span className="text-[11px] text-slate-400 font-medium">등록된 행사 없음</span>
+                ) : (
+                  <div className="flex flex-wrap gap-1 max-w-[260px] justify-start md:justify-end">
+                    {todayEvents.slice(0, 3).map((ev, i) => (
+                      <span key={i} className="rounded bg-white/90 border border-violet-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-700 truncate max-w-[220px]">
+                        {ev.content}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 border-t border-slate-100 pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-500 mr-1.5">학년:</span>
+                {gradesList.map(g => (
+                  <button
+                    key={g}
+                    onClick={() => handleGradeClick(g)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${selectedGrade === g ? "bg-violet-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-1.5 ml-auto">
+                <button
+                  onClick={handleToggleAdminMode}
+                  className={`flex items-center gap-1 shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition shadow-2xs ${isAdminMode ? "bg-amber-500 text-white" : "border border-amber-300 bg-amber-50 text-amber-800"}`}
+                >
+                  <ShieldAlertIcon size={13} /> {isAdminMode ? "관리자 켜짐" : "관리자 모드"}
+                </button>
+                <button
+                  onClick={openClassConfigModal}
+                  className="flex items-center gap-1 shrink-0 rounded-lg border border-violet-200 bg-white px-2.5 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-50 shadow-2xs"
+                >
+                  <SettingsIcon size={13} /> 설정
+                </button>
+                <button
+                  onClick={() => { setSelectedHolidayDate(ymd(new Date())); setHolidayModalOpen(true); }}
+                  className="flex items-center gap-1 shrink-0 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 shadow-2xs"
+                >
+                  <span>🏖️</span> 휴일
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="text-xs font-bold text-slate-500 mr-1.5">학급/전담:</span>
+              {activeClassList.map(c => (
+                <button
+                  key={c}
+                  onClick={() => promptSwitchClass(selectedGrade, c)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${selectedClass === c ? "bg-violet-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* 캘린더 본문 */}
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <span className="text-sm font-bold text-slate-700">{monthLabel}</span>
-          <button
-            onClick={() => openAddEvent(ymd(today))}
-            className="flex items-center gap-1 rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-violet-700"
-          >
-            <PlusIcon size={14} /> 일정 추가
-          </button>
+        {/* 탭 & 출력/저장 & 날짜 이동 바 */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-100">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+              <button onClick={() => setTab("month")} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${tab === "month" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500"}`}>월별</button>
+              <button onClick={() => setTab("week")} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${tab === "week" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500"}`}>주간</button>
+            </div>
+            <button onClick={handlePrint} className="flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 shadow-xs">
+              <PrinterIcon size={14} /> 출력/저장
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button onClick={goPrev} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><ChevronLeft size={18} /></button>
+            <span className="min-w-[90px] text-center text-sm font-bold text-slate-700">{tab === "month" ? monthLabel : weekLabel}</span>
+            <button onClick={goNext} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><ChevronRight size={18} /></button>
+            <button onClick={goToday} className="ml-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500">오늘</button>
+          </div>
         </div>
 
+        {/* 오늘의 행사 위치가 'notice'일 때 */}
+        {todayPosition === "notice" && (
+          <div className="mb-4 rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-600 p-4 text-white shadow-sm ring-1 ring-violet-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5 text-xs font-extrabold">
+                <span>📢</span>
+                <span>오늘의 행사 ({today.getMonth() + 1}/{today.getDate()} {WEEKDAY_KOR[today.getDay()]})</span>
+              </div>
+            </div>
+            {todayEvents.length === 0 ? (
+              <p className="text-xs text-violet-100 py-1">오늘 예정된 행사가 없습니다.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {todayEvents.map((ev, i) => (
+                  <div key={i} className="flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-1.5 text-slate-800 text-xs font-bold shadow-xs">
+                    <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700 font-extrabold">{ev.dept}</span>
+                    <span>{ev.content}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 공지 및 협의사항 */}
+        <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold text-slate-800">공지 및 협의사항</span>
+              <span className="text-[11px] text-slate-400 font-medium">({selectedGrade} {selectedClass ? selectedClass : '공통'})</span>
+            </div>
+            <button onClick={openNoticeEditModal} className="rounded-lg bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-200 transition shadow-2xs">글쓰기/수정</button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 space-y-1">
+              <span className="rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white">학년 공통 공지</span>
+              <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed min-h-[40px] pt-1">
+                {activeGradeNotice ? activeGradeNotice : <span className="text-slate-300">등록된 학년 공통 공지가 없습니다.</span>}
+              </p>
+            </div>
+            <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-3 space-y-1">
+              <span className="rounded bg-violet-600 px-1.5 py-0.5 text-[10px] font-bold text-white">[{selectedClass ? selectedClass : '학급'}] 알림장</span>
+              <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed min-h-[40px] pt-1">
+                {activeClassNotice ? activeClassNotice : <span className="text-slate-300">등록된 학급 전달사항이 없습니다.</span>}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 버튼 바 */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="ml-auto flex items-center gap-2">
+            {selectedEventIds.size > 0 && (
+              <button onClick={openDeleteModal} className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 shadow-sm hover:bg-rose-100 transition animate-pulse">
+                <Trash2Icon size={14} /> 선택 삭제 ({selectedEventIds.size})
+              </button>
+            )}
+            <button onClick={() => { setCsvParsedData([]); setCsvFileName(""); setCsvError(""); setCsvModalOpen(true); }} className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 shadow-2xs">
+              <UploadCloudIcon size={15} /> <span>CSV 일괄 업로드</span>
+            </button>
+            <button onClick={() => openAddEvent(ymd(today))} className="flex items-center gap-1 rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-violet-700">
+              <PlusIcon size={14} /> 일정 추가
+            </button>
+          </div>
+        </div>
+
+        {/* 캘린더 리스트 본문 */}
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 mb-8">
-          {monthDays.map((d, idx) => {
+          {(tab === "month" ? monthDays : weekDates).map((d, idx) => {
             const dStr = ymd(d);
             const dayEvents = eventsByDate[dStr] || [];
+            const evIds = dayEvents.map(e => e.id);
+            const isDateSelected = evIds.length > 0 && evIds.every(id => selectedEventIds.has(id));
+
             return (
               <DateRow
                 key={dStr}
                 date={d}
                 today={today}
                 events={dayEvents}
-                isLast={idx === monthDays.length - 1}
+                isLast={idx === (tab === "month" ? monthDays : weekDates).length - 1}
                 onAddEvent={openAddEvent}
-                onOpenEvent={() => {}}
+                onOpenEvent={openEditEvent}
                 customHolidays={customHolidays}
-                selectedEventIds={new Set()}
-                onToggleSelectEvent={() => {}}
-                onToggleSelectDate={() => {}}
-                isDateSelected={false}
+                selectedEventIds={selectedEventIds}
+                onToggleSelectEvent={handleToggleSelectEvent}
+                onToggleSelectDate={handleToggleSelectDate}
+                isDateSelected={isDateSelected}
               />
             );
           })}
@@ -439,45 +1505,98 @@ function App() {
               </div>
 
               <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setSchoolModalOpen(false)}
-                  className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleApplySchoolChange(tempOffice, tempSchool)}
-                  className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 shadow-md"
-                >
-                  [{tempSchool}] 접속하기
-                </button>
+                <button type="button" onClick={() => setSchoolModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500">취소</button>
+                <button type="button" onClick={() => handleApplySchoolChange(tempOffice, tempSchool)} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white shadow-md">[{tempSchool}] 접속하기</button>
               </div>
             </div>
           </Modal>
         )}
 
-        {/* 일정 추가 모달 */}
+        {/* CSV 일괄 업로드 모달 */}
+        {csvModalOpen && (
+          <Modal title="일정 CSV 파일 일괄 업로드" onClose={() => setCsvModalOpen(false)} wide>
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-indigo-950 block">템플릿 다운로드 및 안내</span>
+                  <button type="button" onClick={downloadCsvTemplate} className="rounded-xl bg-white border border-indigo-300 px-3 py-1.5 text-xs font-extrabold text-indigo-700">📄 엑셀 양식 다운로드</button>
+                </div>
+              </div>
+              <div>
+                <FieldLabel>파일 선택 (.xls 또는 .csv)</FieldLabel>
+                <input type="file" accept=".csv, .txt, .xls, .xml" onChange={handleCsvFileUpload} className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"/>
+              </div>
+              {csvParsedData.length > 0 && (
+                <p className="text-xs font-bold text-emerald-600">✓ 총 {csvParsedData.length}건 인식 완료</p>
+              )}
+              <div className="flex items-center gap-2 pt-2 border-t">
+                <button type="button" onClick={() => setCsvModalOpen(false)} className="flex-1 rounded-xl border py-2.5 text-sm font-bold text-slate-500">취소</button>
+                <button type="button" disabled={csvParsedData.length === 0} onClick={handleConfirmBatchUpload} className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-sm font-bold text-white">일괄 등록하기</button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* 공지 작성 모달 */}
+        {noticeModalOpen && (
+          <Modal title="공지사항 작성" onClose={() => setNoticeModalOpen(false)} wide>
+            <div className="space-y-4">
+              <select value={noticeScope} onChange={(e) => handleScopeChange(e.target.value)} className={inputCls}>
+                <option value="grade">📢 [{selectedGrade}] 학년 공통 공지</option>
+                <option value="class">🏫 [{selectedGrade} {selectedClass || '학급'}] 알림장</option>
+              </select>
+              <textarea value={modalNoticeText} onChange={(e) => setModalNoticeText(e.target.value)} rows={4} className={inputCls} placeholder="내용을 입력하세요."/>
+              <div className="flex items-center gap-2 pt-2 border-t">
+                <button type="button" onClick={handleDeleteNoticeModal} className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">삭제</button>
+                <button type="button" onClick={() => setNoticeModalOpen(false)} className="flex-1 rounded-xl border py-2 text-sm font-bold text-slate-500">취소</button>
+                <button type="button" onClick={handleSaveNoticeModal} className="flex-1 rounded-xl bg-violet-600 py-2 text-sm font-bold text-white">저장</button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* 설정 모달 */}
+        {classConfigModalOpen && (
+          <Modal title="학급 구성 및 환경 설정" onClose={() => setClassConfigModalOpen(false)} wide>
+            <div className="space-y-4">
+              <div className="rounded-xl border bg-slate-50 p-3 space-y-2">
+                <FieldLabel>📌 오늘의 행사 표시 위치</FieldLabel>
+                <div className="flex gap-4 text-xs font-bold">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="pos" checked={todayPosition === "header"} onChange={() => handleUpdateTodayPosition("header")} /> 상단 헤더 우측
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="pos" checked={todayPosition === "notice"} onChange={() => handleUpdateTodayPosition("notice")} /> 공지사항 상단 패널
+                  </label>
+                </div>
+              </div>
+              <button type="button" onClick={() => setClassConfigModalOpen(false)} className="w-full rounded-xl border py-2.5 text-sm font-bold text-slate-600">닫기</button>
+            </div>
+          </Modal>
+        )}
+
+        {/* 관리자 모드 인증 모달 */}
+        {adminAuthModalOpen && (
+          <Modal title="마스터 관리자 인증" onClose={() => setAdminAuthModalOpen(false)}>
+            <FieldLabel>마스터 비밀번호</FieldLabel>
+            <input type="password" autoFocus value={adminAuthPwInput} onChange={(e) => setAdminAuthPwInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirmAdminAuth()} className={inputCls} placeholder="비밀번호 입력"/>
+            {adminAuthError && <p className="mt-2 text-xs font-semibold text-rose-500">{adminAuthError}</p>}
+            <div className="mt-4 flex items-center gap-2">
+              <button onClick={() => setAdminAuthModalOpen(false)} className="flex-1 rounded-xl border py-2.5 text-sm font-bold text-slate-500">취소</button>
+              <button onClick={confirmAdminAuth} className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-bold text-white">인증</button>
+            </div>
+          </Modal>
+        )}
+
+        {/* 일정 추가/수정 모달 */}
         {eventModal && (
-          <Modal title="일정 등록" onClose={() => setEventModal(false)}>
+          <Modal title={eventModal.mode === "add" ? "일정 일괄 추가" : "일정 수정"} onClose={() => setEventModal(null)} wide>
             <div className="space-y-3">
               <div>
                 <FieldLabel>행사 내용</FieldLabel>
-                <input
-                  type="text"
-                  value={form.content}
-                  onChange={(e) => setForm({ ...form, content: e.target.value })}
-                  placeholder="예) 현장체험학습"
-                  className={inputCls}
-                />
+                <input type="text" value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} placeholder="예) 현장체험학습" className={inputCls}/>
               </div>
-              <button
-                onClick={saveEvent}
-                className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 shadow-md"
-              >
-                저장하기
-              </button>
+              <button onClick={saveEvent} className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white shadow-md">저장하기</button>
             </div>
           </Modal>
         )}
