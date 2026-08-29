@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>학급 행사 관리 플래너</title>
-<!-- Tailwind CSS & React & Supabase CDN -->
+<title>학급 및 전담 행사 관리 플래너</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -66,18 +65,6 @@ const CopyIcon = ({ size = 15, className = "" }) => (
 const PrinterIcon = ({ size = 14, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
 );
-const DownloadIcon = ({ size = 14, className = "" }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-);
-const UploadCloudIcon = ({ size = 14, className = "" }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
-);
-const LockIcon = ({ size = 12, className = "" }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-);
-const ShieldCheckIcon = ({ size = 14, className = "" }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
-);
 const CalendarDaysIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
 );
@@ -89,7 +76,7 @@ const KeyIcon = ({ size = 14, className = "" }) => (
 );
 
 const GRADES = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
-const CLASSES = ["1반", "2반", "3반", "4반", "5반", "6반"];
+const INITIAL_CLASSES = ["1반", "2반", "3반", "4반", "5반", "6반"];
 const EVENT_CATEGORIES = ["학년 공통", "학급 일반", "학습", "업무"];
 const WEEKDAY_KOR = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -170,32 +157,6 @@ function getHolidayName(dateStr, customHolidays) {
   const mmdd = dateStr.slice(5);
   if (FIXED_HOLIDAYS[mmdd]) return FIXED_HOLIDAYS[mmdd];
   return null;
-}
-
-function parseCSV(text) {
-  const lines = text.split(/\r\n|\n/);
-  const result = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const row = [];
-    let insideQuotes = false;
-    let entry = '';
-    for (let j = 0; j < line.length; j++) {
-      const char = line[j];
-      if (char === '"') {
-        insideQuotes = !insideQuotes;
-      } else if (char === ',' && !insideQuotes) {
-        row.push(entry.trim());
-        entry = '';
-      } else {
-        entry += char;
-      }
-    }
-    row.push(entry.trim());
-    result.push(row);
-  }
-  return result;
 }
 
 function sortEvents(events) {
@@ -287,13 +248,35 @@ function App() {
   const [selectedGrade, setSelectedGrade] = useState("1학년");
   const [selectedClass, setSelectedClass] = useState("1반");
 
-  // 각 반별 비밀번호 관리 (기본값 "1234")
+  const [tempGrade, setTempGrade] = useState("1학년");
+  const [tempClass, setTempClass] = useState("1반");
+
+  // 반/전담 목록 관리 (로컬스토리지 연동)
+  const [classList, setClassList] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("sp_class_list")) || INITIAL_CLASSES; } catch { return INITIAL_CLASSES; }
+  });
+  const [addClassModalOpen, setAddClassModalOpen] = useState(false);
+  const [newClassInput, setNewClassInput] = useState("");
+
+  const handleAddClassOrSubject = () => {
+    const trimmed = newClassInput.trim();
+    if (!trimmed) return;
+    if (classList.includes(trimmed)) {
+      alert("이미 존재하는 학급/전담 명칭입니다.");
+      return;
+    }
+    const updated = [...classList, trimmed];
+    setClassList(updated);
+    localStorage.setItem("sp_class_list", JSON.stringify(updated));
+    setNewClassInput("");
+    setAddClassModalOpen(false);
+    alert(`'${trimmed}'이(가) 추가되었습니다!`);
+  };
+
   const [classPasswords, setClassPasswords] = useState(() => {
     try { return JSON.parse(localStorage.getItem("sp_class_passwords")) || {}; } catch { return {}; }
   });
   const [switchModalOpen, setSwitchModalOpen] = useState(false);
-  const [targetGrade, setTargetGrade] = useState("1학년");
-  const [targetClass, setTargetClass] = useState("1반");
   const [switchPwInput, setSwitchPwInput] = useState("");
   const [switchError, setSwitchError] = useState("");
   const [isSettingNewPw, setIsSettingNewPw] = useState(false);
@@ -302,33 +285,33 @@ function App() {
   const currentClassKey = `${selectedGrade}_${selectedClass}`;
   const currentClassPassword = classPasswords[currentClassKey] || "1234";
 
-  const handleAttemptSwitch = (g, c) => {
-    setTargetGrade(g);
-    setTargetClass(c);
+  const handleSaveAndSwitchClass = () => {
+    const key = `${tempGrade}_${tempClass}`;
+    const registeredPw = classPasswords[key];
+
     setSwitchPwInput("");
     setNewPwInput("");
     setSwitchError("");
-    const key = `${g}_${c}`;
-    setIsSettingNewPw(!classPasswords[key]);
+    setIsSettingNewPw(!registeredPw);
     setSwitchModalOpen(true);
   };
 
   const confirmSwitchClass = () => {
-    const key = `${targetGrade}_${targetClass}`;
+    const key = `${tempGrade}_${tempClass}`;
     const registeredPw = classPasswords[key];
 
     if (!registeredPw) {
       if (!newPwInput.trim()) {
-        setSwitchError("새로 사용할 비밀번호(숫자 4자리 등)를 입력해주세요.");
+        setSwitchError("새로 사용할 비밀번호를 입력해주세요.");
         return;
       }
       const updated = { ...classPasswords, [key]: newPwInput.trim() };
       setClassPasswords(updated);
       localStorage.setItem("sp_class_passwords", JSON.stringify(updated));
-      setSelectedGrade(targetGrade);
-      setSelectedClass(targetClass);
+      setSelectedGrade(tempGrade);
+      setSelectedClass(tempClass);
       setSwitchModalOpen(false);
-      alert(`${targetGrade} ${targetClass} 비밀번호가 설정되고 전환되었습니다.`);
+      alert(`${tempGrade} ${tempClass} 비밀번호가 설정되고 전환되었습니다.`);
       return;
     }
 
@@ -337,8 +320,8 @@ function App() {
       return;
     }
 
-    setSelectedGrade(targetGrade);
-    setSelectedClass(targetClass);
+    setSelectedGrade(tempGrade);
+    setSelectedClass(tempClass);
     setSwitchModalOpen(false);
   };
 
@@ -359,10 +342,6 @@ function App() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletePwInput, setDeletePwInput] = useState("");
   const [deletePwError, setDeletePwError] = useState("");
-
-  const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState("");
-  const fileInputRef = useRef(null);
 
   const [customHolidays, setCustomHolidays] = useState(() => {
     try { return JSON.parse(localStorage.getItem("sp_custom_holidays")) || {}; } catch { return {}; }
@@ -471,7 +450,6 @@ function App() {
     return () => clearInterval(timer);
   }, [supabase, fetchAllData]);
 
-  // 현재 학급 필터링 및 학년 공통 일정 포함 처리
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (e.grade !== selectedGrade) return false;
@@ -700,8 +678,7 @@ function App() {
       const eventPassword = form.password.trim() || currentClassPassword;
       
       if (finalCategory === "학년 공통") {
-        // 학년 공통일 경우 해당 학년의 모든 반(1~6반)에 일괄 등록
-        const newEvents = CLASSES.map((clsNum, idx) => ({
+        const newEvents = classList.map((clsNum, idx) => ({
           id: Math.floor(Date.now() % 2147483647) + idx,
           date: form.date,
           grade: selectedGrade,
@@ -789,12 +766,12 @@ function App() {
           </div>
         )}
 
-        {/* 헤더 및 학년·반 선택 전환 바 */}
+        {/* 헤더 및 학년·반 선택 및 저장 바 */}
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
-              <h1 className="text-lg font-extrabold text-slate-800 sm:text-xl">학급 행사 관리 플래너</h1>
-              <p className="text-xs text-slate-400">현재 보기: <span className="text-violet-600 font-bold">{selectedGrade} {selectedClass}</span> (담임 비밀번호로 전환)</p>
+              <h1 className="text-lg font-extrabold text-slate-800 sm:text-xl">학급 및 전담 행사 관리 플래너</h1>
+              <p className="text-xs text-slate-400">현재 보기: <span className="text-violet-600 font-bold">{selectedGrade} {selectedClass}</span></p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -806,31 +783,45 @@ function App() {
             </div>
           </div>
 
-          {/* 학년 및 반 버튼 선택 패널 */}
-          <div className="space-y-2 border-t border-slate-100 pt-3">
+          {/* 학년 및 반 선택 패널 및 저장 버튼 */}
+          <div className="space-y-3 border-t border-slate-100 pt-3">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs font-bold text-slate-500 mr-2">학년 선택:</span>
               {GRADES.map(g => (
                 <button
                   key={g}
-                  onClick={() => handleAttemptSwitch(g, selectedClass)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${selectedGrade === g ? "bg-violet-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                  onClick={() => setTempGrade(g)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${tempGrade === g ? "bg-violet-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
                 >
                   {g}
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-500 mr-2">학급 선택:</span>
-              {CLASSES.map(c => (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-500 mr-2">학급/전담 선택:</span>
+                {classList.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setTempClass(c)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${tempClass === c ? "bg-violet-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                  >
+                    {c}
+                  </button>
+                ))}
                 <button
-                  key={c}
-                  onClick={() => handleAttemptSwitch(selectedGrade, c)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${selectedClass === c ? "bg-violet-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                  onClick={() => { setNewClassInput(""); setAddClassModalOpen(true); }}
+                  className="rounded-lg border border-dashed border-violet-300 bg-violet-50 px-2.5 py-1.5 text-xs font-bold text-violet-600 hover:bg-violet-100 transition flex items-center gap-1"
                 >
-                  {c}
+                  <PlusIcon size={12} /> 추가
                 </button>
-              ))}
+              </div>
+              <button
+                onClick={handleSaveAndSwitchClass}
+                className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-violet-700 transition shrink-0"
+              >
+                저장 (전환하기)
+              </button>
             </div>
           </div>
         </div>
@@ -882,7 +873,7 @@ function App() {
             readOnly={!isNoticeEditing}
             rows={2}
             className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition resize-y min-h-[50px] ${isNoticeEditing ? "border-violet-400 bg-white ring-2 ring-violet-100 text-slate-700" : "border-slate-200 bg-slate-50 text-slate-500 cursor-default"}`}
-            placeholder="예) 학급 알림장 및 전달 사항"
+            placeholder="예) 학급/전담 알림장 및 전달 사항"
           />
         </div>
 
@@ -933,13 +924,36 @@ function App() {
           })}
         </div>
 
-        {/* 1. 학급 전환 비밀번호 인증 모달 */}
+        {/* 학급/전담 추가 모달 */}
+        {addClassModalOpen && (
+          <Modal title="새 학급 또는 전담 추가" onClose={() => setAddClassModalOpen(false)}>
+            <p className="mb-3 text-xs text-slate-500 leading-relaxed">
+              사용할 명칭을 자유롭게 입력해주세요. (예: <b>영어 전담</b>, <b>과학 전담</b>, <b>특수반</b> 등)
+            </p>
+            <FieldLabel>명칭 입력</FieldLabel>
+            <input
+              type="text"
+              autoFocus
+              value={newClassInput}
+              onChange={(e) => setNewClassInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddClassOrSubject()}
+              className={inputCls}
+              placeholder="예) 영어 전담"
+            />
+            <div className="mt-4 flex items-center gap-2">
+              <button onClick={() => setAddClassModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
+              <button onClick={handleAddClassOrSubject} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">추가하기</button>
+            </div>
+          </Modal>
+        )}
+
+        {/* 학급 전환 비밀번호 인증 모달 */}
         {switchModalOpen && (
-          <Modal title={`${targetGrade} ${targetClass} 전환 인증`} onClose={() => setSwitchModalOpen(false)}>
+          <Modal title={`${tempGrade} ${tempClass} 전환 인증`} onClose={() => setSwitchModalOpen(false)}>
             <p className="mb-3 text-xs text-slate-500 leading-relaxed">
               {isSettingNewPw 
-                ? `처음 접속하는 반입니다. 이 반의 담임 선생님이 사용할 비밀번호를 설정해주세요.`
-                : `해당 담임 선생님이 설정한 비밀번호를 입력해주세요.`}
+                ? `처음 접속하는 곳입니다. 사용할 비밀번호를 설정해주세요.`
+                : `해당 담당자가 설정한 비밀번호를 입력해주세요.`}
             </p>
             {isSettingNewPw ? (
               <div className="space-y-3">
@@ -951,7 +965,7 @@ function App() {
             ) : (
               <div className="space-y-3">
                 <div>
-                  <FieldLabel>담임 비밀번호</FieldLabel>
+                  <FieldLabel>비밀번호</FieldLabel>
                   <input type="password" autoFocus value={switchPwInput} onChange={(e) => setSwitchPwInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirmSwitchClass()} className={inputCls} placeholder="비밀번호 입력" />
                 </div>
               </div>
@@ -964,13 +978,13 @@ function App() {
           </Modal>
         )}
 
-        {/* 2. 선택 삭제 인증 모달 */}
+        {/* 선택 삭제 인증 모달 */}
         {deleteModalOpen && (
           <Modal title="선택 삭제 확인" onClose={() => setDeleteModalOpen(false)}>
             <p className="mb-3 text-xs text-slate-500 leading-relaxed">
-              선택한 <b>{selectedEventIds.size}개</b>의 일정을 삭제하려면 담임 비밀번호를 입력해주세요.
+              선택한 <b>{selectedEventIds.size}개</b>의 일정을 삭제하려면 비밀번호를 입력해주세요.
             </p>
-            <FieldLabel>담임 비밀번호</FieldLabel>
+            <FieldLabel>비밀번호</FieldLabel>
             <input
               type="password"
               autoFocus
@@ -988,7 +1002,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 3. 재량휴업일 관리 모달 */}
+        {/* 재량휴업일 관리 모달 */}
         {holidayModalOpen && (
           <Modal title="학교 휴일 및 재량휴업일 관리" onClose={() => setHolidayModalOpen(false)} wide>
             <div className="space-y-4">
@@ -1059,7 +1073,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 4. 일정 추가/수정 모달 */}
+        {/* 일정 추가/수정 모달 */}
         {eventModal && (
           <Modal title={eventModal.mode === "add" ? "일정 추가" : "일정 수정"} onClose={() => setEventModal(null)} wide>
             <div className="space-y-3">
@@ -1083,7 +1097,7 @@ function App() {
                     className="h-4 w-4 rounded border-slate-300 text-violet-600 cursor-pointer"
                   />
                   <label htmlFor="gradeCommonCheck" className="text-xs font-bold text-slate-700 cursor-pointer">
-                    학년 공통으로 등록 (선택한 학년의 모든 반에 일괄 반영됩니다)
+                    학년 공통으로 등록 (선택한 학년의 모든 반 및 전담에 일괄 반영됩니다)
                   </label>
                 </div>
               )}
@@ -1098,11 +1112,11 @@ function App() {
               {eventModal.mode === "add" ? (
                 <div>
                   <FieldLabel>비밀번호 (수정/삭제 시 사용할 비밀번호)</FieldLabel>
-                  <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputCls} placeholder="미입력 시 담임 기본 비밀번호 적용" />
+                  <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputCls} placeholder="미입력 시 기본 비밀번호 적용" />
                 </div>
               ) : (
                 <div>
-                  <FieldLabel>비밀번호 (등록 비밀번호 또는 담임 비밀번호)</FieldLabel>
+                  <FieldLabel>비밀번호</FieldLabel>
                   <input type="password" value={pwCheckInput} onChange={(e) => setPwCheckInput(e.target.value)} className={inputCls} placeholder="비밀번호 입력" />
                 </div>
               )}
