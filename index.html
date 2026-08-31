@@ -145,12 +145,8 @@ const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDat
 const sameDay = (a, b) => ymd(a) === ymd(b);
 const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
 
-// [치명적 오류 해결] 누락되었던 addMonths 함수 복구
-const addMonths = (d, n) => {
-  const r = new Date(d);
-  r.setMonth(r.getMonth() + n);
-  return r;
-};
+// 안전한 월 이동 함수 (항상 해당 월의 1일을 기준으로 계산하여 날짜 꼬임 방지)
+const safeAddMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
 
 const startOfWeekMon = (d) => {
   const r = new Date(d);
@@ -794,7 +790,7 @@ function App() {
     alert('마스터 관리자 비밀번호가 성공적으로 변경되었습니다.');
   };
 
-  // [개선된 공지 저장 및 선택적 날짜 연동]
+  // [선택적 날짜 연동형 공지 저장] 날짜를 입력한 경우에만 해당 일자에 [공지] 행사 항목을 추가합니다.
   const handleSaveNoticeModal = async () => {
     const key = getPeriodKey(noticeScope);
     const trimmed = modalNoticeText.trim();
@@ -811,7 +807,6 @@ function App() {
       await supabase.from('admin_status').upsert([{ week_key: `notices_${currentSchool}`, data: updated }]);
     }
 
-    // 만약 사용자가 날짜를 지정했다면 해당 날짜의 일정으로 자동 등록
     if (modalNoticeDate && trimmed) {
       const noticeEvent = {
         id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
@@ -883,7 +878,6 @@ function App() {
     window.location.reload();
   };
 
-  // [정밀 필터링] 1반과 11반 오동작 방지를 위해 쉼표 단위 배열 매칭 적용
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (e.grade !== selectedGrade) return false;
@@ -985,7 +979,6 @@ function App() {
     document.body.removeChild(link);
   };
 
-  // [개선된 CSV 파서] 따옴표 포함 텍스트("국어, 수학") 정상 파싱 지원
   const parseCSVLine = (line) => {
     const row = [];
     let insideQuotes = false;
@@ -1020,7 +1013,6 @@ function App() {
         const parts = parseCSVLine(line);
         if (parts.length >= 3) {
           const rawDate = parts[0];
-          // 간단한 날짜 유효성 검증 (YYYY-MM-DD)
           if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
             parsed.push({
               date: rawDate,
@@ -1790,7 +1782,6 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
           </Modal>
         )}
 
-        {/* [선택적 날짜 지정 기능 포함된 공지 작성 모달] */}
         {noticeModalOpen && (
           <Modal title="공지 및 협의사항 작성" onClose={() => setNoticeModalOpen(false)} wide>
             <div className="space-y-4">
