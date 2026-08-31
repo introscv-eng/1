@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>인천광역시 초등 학급 및 전담 행사 플래너</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2.45.4"></script>
 <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
 <style>
 body { font-family: 'Inter', sans-serif; }
@@ -22,6 +22,11 @@ body { font-family: 'Inter', sans-serif; }
 <div id="root"></div>
 
 <script type="text/babel">
+/*
+  중요: 이 HTML은 클라이언트 측 오류/권한 검사를 강화했지만, Supabase anon key는 공개 클라이언트 키입니다.
+  실제 접근 통제는 Supabase의 RLS 정책으로 반드시 보완해야 합니다.
+  링크 공유만으로는 DB 보안이 완성되지 않습니다.
+*/
 const SUPABASE_URL = "https://tygsgurwjpojzzrtyhrq.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzlyMzI2OH0.VR6311j_PMhetS3pY3RsIT6G3sFFZZIZNjEg39dtn6s";
 
@@ -156,6 +161,58 @@ const addMonths = (d, n) => {
   return result;
 };
 
+// 비밀번호는 새로 저장할 때 SHA-256 해시로 저장합니다.
+// 기존 평문 데이터는 읽기 호환만 유지하고, 변경 시 자동으로 해시 형식으로 전환됩니다.
+const PW_HASH_PREFIX = "h$";
+const DEFAULT_INITIAL_PASSWORD = "admin1234";
+
+async function hashPassword(raw) {
+  const text = String(raw || "");
+  if (!window.crypto || !window.crypto.subtle) {
+    throw new Error("이 브라우저에서는 안전한 비밀번호 해시 기능을 사용할 수 없습니다.");
+  }
+  const bytes = new TextEncoder().encode(text);
+  const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+  const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+  // 128-bit(32 hex)로 잘라 저장 길이를 짧게 유지합니다. 비밀번호 용도에는 충분한 충돌 안전성을 제공합니다.
+  return PW_HASH_PREFIX + hex.slice(0, 32);
+}
+
+async function passwordForStorage(rawOrStored) {
+  const value = String(rawOrStored || "");
+  if (value.startsWith(PW_HASH_PREFIX)) return value;
+  return hashPassword(value);
+}
+
+async function verifyPassword(input, stored) {
+  const saved = String(stored || "");
+  if (!saved) return false;
+  if (saved.startsWith(PW_HASH_PREFIX)) {
+    return (await hashPassword(input)) === saved;
+  }
+  // 이전 버전 평문 비밀번호 호환
+  return String(input || "") === saved;
+}
+
+function createEventId(usedIds = null) {
+  const occupied = usedIds || new Set();
+  for (let i = 0; i < 20; i++) {
+    let id;
+    if (window.crypto && window.crypto.getRandomValues) {
+      const arr = new Uint32Array(1);
+      window.crypto.getRandomValues(arr);
+      id = 1 + (arr[0] % 2147483646);
+    } else {
+      id = 1 + (Math.floor(Date.now() + Math.random() * 1000000) % 2147483646);
+    }
+    if (!occupied.has(id)) {
+      occupied.add(id);
+      return id;
+    }
+  }
+  throw new Error("고유 일정 ID 생성에 실패했습니다. 다시 시도해주세요.");
+}
+
 const startOfWeekMon = (d) => {
   const r = new Date(d);
   const day = r.getDay();
@@ -240,15 +297,30 @@ const UploadCloudIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
 );
 
-const DEPT_SEP = "::";
-const packClassDept = (className, category = "학급 일반") => `${className || "1반"}${DEPT_SEP}${category || "학급 일반"}`;
+const DEPT_SEP = "::"; // 이전 버전 호환용
+const CATEGORY_PREFIX_RE = /^\[\[CAT:(학년 공통|학급 일반|학습|업무)\]\]\s*/;
+
+// DB의 dept 컬럼 제약조건과 충돌하지 않도록 새 학급 일정은 dept에 "1반"처럼 학급명만 저장합니다.
+// 카테고리는 content 앞에 내부 마커로 보존하고 화면/출력에서는 마커를 숨깁니다.
+const encodeEventContent = (content, category) => {
+  const clean = String(content || "").replace(CATEGORY_PREFIX_RE, "");
+  if (!category || category === "학년 공통" || category === "학급 일반") return clean;
+  return `[[CAT:${category}]] ${clean}`;
+};
+
+function getEventContent(ev) {
+  return String((ev && ev.content) || "").replace(CATEGORY_PREFIX_RE, "");
+}
 
 function getEventCategory(ev) {
   const dept = (ev && ev.dept) || "";
+  const content = String((ev && ev.content) || "");
+  const marker = content.match(CATEGORY_PREFIX_RE);
   if (dept === "학년 공통") return "학년 공통";
+  if (marker && EVENT_CATEGORIES.includes(marker[1])) return marker[1];
   if (dept.includes(DEPT_SEP)) {
     const [, category] = dept.split(DEPT_SEP);
-    return category || "학급 일반";
+    return EVENT_CATEGORIES.includes(category) ? category : "학급 일반";
   }
   if (EVENT_CATEGORIES.includes(dept)) return dept;
   return "학급 일반";
@@ -270,7 +342,7 @@ function sortEvents(events) {
     const idxA = catOrder.indexOf(catA);
     const idxB = catOrder.indexOf(catB);
     if (idxA !== idxB) return (idxA !== -1 ? idxA : 999) - (idxB !== -1 ? idxB : 999);
-    return (a.content || "").localeCompare(b.content || "", "ko");
+    return getEventContent(a).localeCompare(getEventContent(b), "ko");
   });
 }
 
@@ -335,7 +407,7 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
                       [{targetBadgeText}]
                     </span>
                   )}
-                  <span className="pt-0.5 text-[13px] font-medium truncate">{ev.content}</span>
+                  <span className="pt-0.5 text-[13px] font-medium truncate">{getEventContent(ev)}</span>
                   {!isGradeCommon && ev.manager && (
                     <span className="ml-auto shrink-0 pt-0.5 text-[13px] leading-snug text-slate-700 font-medium pl-2">
                       {ev.manager}
@@ -447,7 +519,7 @@ function App() {
   const [schoolAuthPwInput, setSchoolAuthPwInput] = useState("");
   const [pendingSchoolChange, setPendingSchoolChange] = useState(null);
 
-  const [masterPassword, setMasterPassword] = useState("admin1234");
+  const [masterPassword, setMasterPassword] = useState(DEFAULT_INITIAL_PASSWORD);
   const [classPasswords, setClassPasswords] = useState({});
 
   const [gradesList, setGradesList] = useState(INITIAL_GRADES);
@@ -494,9 +566,10 @@ function App() {
   const [newPwInput, setNewPwInput] = useState("");
 
   const currentClassPassword = selectedClass
-    ? (classPasswords[`${selectedGrade}_${selectedClass}`] || "admin1234") : "admin1234";
+    ? (classPasswords[`${selectedGrade}_${selectedClass}`] || DEFAULT_INITIAL_PASSWORD) : DEFAULT_INITIAL_PASSWORD;
 
   const handleGradeClick = (g) => {
+    setSelectedEventIds(new Set());
     setSelectedGrade(g);
     setSelectedClass(null);
     localStorage.setItem(`sp_last_grade_${currentSchool}`, g);
@@ -506,6 +579,7 @@ function App() {
   const promptSwitchClass = (g, c) => {
     if (g === selectedGrade && c === selectedClass) return;
     if (isAdminMode) {
+      setSelectedEventIds(new Set());
       setSelectedGrade(g);
       setSelectedClass(c);
       localStorage.setItem(`sp_last_grade_${currentSchool}`, g);
@@ -521,39 +595,59 @@ function App() {
     setIsSettingNewPw(!registeredPw);
   };
 
-  const confirmSwitchClass = () => {
+  const confirmSwitchClass = async () => {
     if (!targetSwitch) return;
     const { grade, class: cls } = targetSwitch;
     const key = `${grade}_${cls}`;
     const registeredPw = classPasswords[key];
 
-    if (!registeredPw) {
-      if (!newPwInput.trim()) {
-        setSwitchError("새로 사용할 비밀번호를 입력해주세요.");
+    try {
+      if (!registeredPw) {
+        if (!newPwInput.trim()) {
+          setSwitchError("새로 사용할 비밀번호를 입력해주세요.");
+          return;
+        }
+        if (!supabase) {
+          setSwitchError("데이터베이스 연결이 없습니다. 잠시 후 다시 시도해주세요.");
+          return;
+        }
+        const storedPw = await passwordForStorage(newPwInput.trim());
+        const updated = { ...classPasswords, [key]: storedPw };
+        const { error } = await supabase.from('admin_status').upsert([
+          { week_key: `class_pw_${currentSchool}`, data: updated }
+        ]);
+        if (error) {
+          console.error("최초 학급 비밀번호 저장 실패:", error);
+          setSwitchError(`비밀번호 저장에 실패했습니다: ${error.message || "DB 오류"}`);
+          return;
+        }
+        setClassPasswords(updated);
+        setSelectedEventIds(new Set());
+        setSelectedGrade(grade);
+        setSelectedClass(cls);
+        localStorage.setItem(`sp_last_grade_${currentSchool}`, grade);
+        localStorage.setItem(`sp_last_class_${currentSchool}`, cls);
+        setTargetSwitch(null);
+        alert(`${grade} ${cls} 비밀번호가 설정되고 전환되었습니다.`);
         return;
       }
-      const updated = { ...classPasswords, [key]: newPwInput.trim() };
-      setClassPasswords(updated);
-      localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(updated));
+
+      const classOk = await verifyPassword(switchPwInput, registeredPw);
+      const masterOk = await verifyPassword(switchPwInput, masterPassword);
+      if (!classOk && !masterOk) {
+        setSwitchError("비밀번호가 일치하지 않습니다.");
+        return;
+      }
+      setSelectedEventIds(new Set());
       setSelectedGrade(grade);
       setSelectedClass(cls);
       localStorage.setItem(`sp_last_grade_${currentSchool}`, grade);
       localStorage.setItem(`sp_last_class_${currentSchool}`, cls);
       setTargetSwitch(null);
-      alert(`${grade} ${cls} 비밀번호가 설정되고 전환되었습니다.`);
-      return;
+    } catch (err) {
+      console.error(err);
+      setSwitchError(err.message || "비밀번호 확인 중 오류가 발생했습니다.");
     }
-
-    if (switchPwInput !== registeredPw && switchPwInput !== masterPassword) {
-      setSwitchError("비밀번호가 일치하지 않습니다. 틀렸습니다.");
-      alert("비밀번호가 일치하지 않습니다.");
-      return;
-    }
-    setSelectedGrade(grade);
-    setSelectedClass(cls);
-    localStorage.setItem(`sp_last_grade_${currentSchool}`, grade);
-    localStorage.setItem(`sp_last_class_${currentSchool}`, cls);
-    setTargetSwitch(null);
   };
 
   const handleToggleAdminMode = () => {
@@ -567,14 +661,17 @@ function App() {
     }
   };
 
-  const confirmAdminAuth = () => {
-    if (adminAuthPwInput === masterPassword) {
-      setIsAdminMode(true);
-      setAdminAuthModalOpen(false);
-      alert("관리자 모드로 전환되었습니다.");
-    } else {
-      setAdminAuthError("마스터 비밀번호가 일치하지 않습니다.");
-      alert("마스터 비밀번호가 틀렸습니다.");
+  const confirmAdminAuth = async () => {
+    try {
+      if (await verifyPassword(adminAuthPwInput, masterPassword)) {
+        setIsAdminMode(true);
+        setAdminAuthModalOpen(false);
+        alert("관리자 모드로 전환되었습니다.");
+      } else {
+        setAdminAuthError("마스터 비밀번호가 일치하지 않습니다.");
+      }
+    } catch (err) {
+      setAdminAuthError(err.message || "비밀번호 확인 중 오류가 발생했습니다.");
     }
   };
 
@@ -653,52 +750,67 @@ function App() {
 
   const fetchAllData = useCallback(async () => {
     if (!supabase || !currentSchool) return;
+
     try {
-      const { data: dbEvents, error: evErr } = await supabase.from('events').select('*').eq('school_name', currentSchool);
+      const { data: dbEvents, error: evErr } = await supabase
+        .from('events').select('*').eq('school_name', currentSchool);
       if (evErr) console.error("events 조회 실패:", evErr);
       else setEvents(dbEvents || []);
-    } catch(e) {}
+    } catch (e) {
+      console.error("events 조회 예외:", e);
+    }
+
+    const schoolTodayKey = `today_pos_${currentSchool}`;
+    const neededKeys = [
+      `holidays_${currentSchool}`,
+      `notices_${currentSchool}`,
+      `configs_${currentSchool}`,
+      `grades_${currentSchool}`,
+      `master_pw_${currentSchool}`,
+      `class_pw_${currentSchool}`,
+      schoolTodayKey,
+      'today_pos_setting' // 이전 버전 설정 읽기 호환
+    ];
+
     try {
-      const { data: dbAdmin, error: adErr } = await supabase.from('admin_status').select('*');
+      const { data: dbAdmin, error: adErr } = await supabase
+        .from('admin_status').select('*').in('week_key', neededKeys);
       if (adErr) {
         console.error("admin_status 조회 실패:", adErr);
         return;
       }
-      if (dbAdmin) {
-        dbAdmin.forEach(item => {
-          if (item.week_key === `holidays_${currentSchool}`) {
-            setCustomHolidays(item.data || {});
-            localStorage.setItem(`sp_holidays_${currentSchool}`, JSON.stringify(item.data || {}));
-          } else if (item.week_key === `notices_${currentSchool}`) {
-            setNotices(item.data || {});
-            localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(item.data || {}));
-          } else if (item.week_key === `configs_${currentSchool}`) {
-            setGradeConfigs(item.data || {});
-            localStorage.setItem(`sp_grade_configs_${currentSchool}`, JSON.stringify(item.data || {}));
-          } else if (item.week_key === `grades_${currentSchool}`) {
-            if (Array.isArray(item.data)) {
-              setGradesList(item.data);
-              localStorage.setItem(`sp_grade_list_${currentSchool}`, JSON.stringify(item.data));
-            }
-          } else if (item.week_key === `master_pw_${currentSchool}`) {
-            if (item.data && item.data.password) {
-              setMasterPassword(item.data.password);
-              localStorage.setItem(`sp_master_pw_${currentSchool}`, item.data.password);
-            }
-          } else if (item.week_key === `class_pw_${currentSchool}`) {
-            if (item.data) {
-              setClassPasswords(item.data);
-              localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(item.data));
-            }
-          } else if (item.week_key === 'today_pos_setting') {
-            if (item.data && item.data.pos) {
-              setTodayPosition(item.data.pos);
-              localStorage.setItem("sp_today_pos", item.data.pos);
-            }
-          }
-        });
+      let schoolTodayFound = false;
+      (dbAdmin || []).forEach(item => {
+        if (item.week_key === `holidays_${currentSchool}`) {
+          setCustomHolidays(item.data || {});
+          localStorage.setItem(`sp_holidays_${currentSchool}`, JSON.stringify(item.data || {}));
+        } else if (item.week_key === `notices_${currentSchool}`) {
+          setNotices(item.data || {});
+          localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(item.data || {}));
+        } else if (item.week_key === `configs_${currentSchool}`) {
+          setGradeConfigs(item.data || {});
+          localStorage.setItem(`sp_grade_configs_${currentSchool}`, JSON.stringify(item.data || {}));
+        } else if (item.week_key === `grades_${currentSchool}` && Array.isArray(item.data)) {
+          setGradesList(item.data);
+          localStorage.setItem(`sp_grade_list_${currentSchool}`, JSON.stringify(item.data));
+        } else if (item.week_key === `master_pw_${currentSchool}` && item.data && item.data.password) {
+          setMasterPassword(item.data.password);
+        } else if (item.week_key === `class_pw_${currentSchool}` && item.data) {
+          setClassPasswords(item.data);
+        } else if (item.week_key === schoolTodayKey && item.data && item.data.pos) {
+          schoolTodayFound = true;
+          setTodayPosition(item.data.pos);
+          localStorage.setItem(`sp_today_pos_${currentSchool}`, item.data.pos);
+        }
+      });
+
+      if (!schoolTodayFound) {
+        const legacy = (dbAdmin || []).find(item => item.week_key === 'today_pos_setting');
+        if (legacy?.data?.pos) setTodayPosition(legacy.data.pos);
       }
-    } catch(e) {}
+    } catch (e) {
+      console.error("admin_status 조회 예외:", e);
+    }
   }, [supabase, currentSchool]);
 
   useEffect(() => {
@@ -708,234 +820,255 @@ function App() {
         const n = localStorage.getItem(`sp_notices_${currentSchool}`); if (n) setNotices(JSON.parse(n));
         const c = localStorage.getItem(`sp_grade_configs_${currentSchool}`); if (c) setGradeConfigs(JSON.parse(c));
         const g = localStorage.getItem(`sp_grade_list_${currentSchool}`); if (g) setGradesList(JSON.parse(g));
-        const mp = localStorage.getItem(`sp_master_pw_${currentSchool}`); if (mp) setMasterPassword(mp);
-        const cp = localStorage.getItem(`sp_class_pw_${currentSchool}`); if (cp) setClassPasswords(JSON.parse(cp));
-        const tp = localStorage.getItem("sp_today_pos"); if (tp) setTodayPosition(tp);
+        const tp = localStorage.getItem(`sp_today_pos_${currentSchool}`); if (tp) setTodayPosition(tp);
         const lg = localStorage.getItem(`sp_last_grade_${currentSchool}`); if (lg) setSelectedGrade(lg);
         const lc = localStorage.getItem(`sp_last_class_${currentSchool}`); if (lc) setSelectedClass(lc);
-      } catch(e){}
+      } catch(e) {
+        console.warn("로컬 설정 복원 실패:", e);
+      }
     }
+
     fetchAllData();
     if (!supabase) return;
-    const timer = setInterval(fetchAllData, 5000);
+    const timer = setInterval(fetchAllData, 20000);
     return () => clearInterval(timer);
   }, [supabase, currentSchool, fetchAllData]);
 
   const handleUpdateTodayPosition = async (newPos) => {
-    setTodayPosition(newPos);
-    localStorage.setItem("sp_today_pos", newPos);
-    if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: 'today_pos_setting', data: { pos: newPos } }]);
+    if (!supabase || !currentSchool) {
+      alert("데이터베이스에 연결되지 않았습니다.");
+      return;
     }
+    const { error } = await supabase.from('admin_status').upsert([
+      { week_key: `today_pos_${currentSchool}`, data: { pos: newPos } }
+    ]);
+    if (error) {
+      console.error("오늘 일정 위치 저장 실패:", error);
+      alert(`설정 저장에 실패했습니다.
+${error.message || "DB 오류"}`);
+      return;
+    }
+    setTodayPosition(newPos);
+    localStorage.setItem(`sp_today_pos_${currentSchool}`, newPos);
   };
 
   const handleAddGrade = async () => {
-    if (!isAdminMode) {
-      alert("학년 추가/삭제는 관리자 모드에서만 가능합니다.");
-      return;
-    }
+    if (!isAdminMode) return alert("학년 추가/삭제는 관리자 모드에서만 가능합니다.");
     const trimmed = newGradeInput.trim();
-    if (!trimmed) {
-      alert("추가할 학년 명칭을 입력해주세요.");
-      return;
-    }
+    if (!trimmed) return alert("추가할 학년 명칭을 입력해주세요.");
     const formatted = trimmed.includes("학년") || trimmed.includes("유치원") || trimmed.includes("반") ? trimmed : `${trimmed}학년`;
-    if (gradesList.includes(formatted)) {
-      alert("이미 존재하는 학년 명칭입니다.");
-      return;
-    }
-    const nextGrades = [...gradesList, formatted];
-    setGradesList(nextGrades);
-    localStorage.setItem(`sp_grade_list_${currentSchool}`, JSON.stringify(nextGrades));
-    const updatedConfigs = { ...gradeConfigs, [formatted]: DEFAULT_CLASS_CONFIG };
-    setGradeConfigs(updatedConfigs);
-    localStorage.setItem(`sp_grade_configs_${currentSchool}`, JSON.stringify(updatedConfigs));
+    if (gradesList.includes(formatted)) return alert("이미 존재하는 학년 명칭입니다.");
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다.");
 
-    if (supabase) {
-      await supabase.from('admin_status').upsert([
-        { week_key: `grades_${currentSchool}`, data: nextGrades },
-        { week_key: `configs_${currentSchool}`, data: updatedConfigs }
-      ]);
-    }
+    const nextGrades = [...gradesList, formatted];
+    const updatedConfigs = { ...gradeConfigs, [formatted]: { ...DEFAULT_CLASS_CONFIG, specialists: [...DEFAULT_CLASS_CONFIG.specialists] } };
+    const { error } = await supabase.from('admin_status').upsert([
+      { week_key: `grades_${currentSchool}`, data: nextGrades },
+      { week_key: `configs_${currentSchool}`, data: updatedConfigs }
+    ]);
+    if (error) return alert(`학년 추가 저장에 실패했습니다.
+${error.message || "DB 오류"}`);
+
+    setGradesList(nextGrades);
+    setGradeConfigs(updatedConfigs);
+    localStorage.setItem(`sp_grade_list_${currentSchool}`, JSON.stringify(nextGrades));
+    localStorage.setItem(`sp_grade_configs_${currentSchool}`, JSON.stringify(updatedConfigs));
     setNewGradeInput("");
     setEditingConfigGrade(formatted);
     alert(`'${formatted}'이(가) 추가되었습니다.`);
   };
 
   const handleDeleteGrade = async (gradeToDelete) => {
-    if (!isAdminMode) {
-      alert("학년 추가/삭제는 관리자 모드에서만 가능합니다.");
-      return;
-    }
-    if (gradesList.length <= 1) {
-      alert("최소 1개 이상의 학년이 유지되어야 합니다.");
-      return;
-    }
+    if (!isAdminMode) return alert("학년 추가/삭제는 관리자 모드에서만 가능합니다.");
+    if (gradesList.length <= 1) return alert("최소 1개 이상의 학년이 유지되어야 합니다.");
     if (!confirm(`'${gradeToDelete}'을(를) 학년 목록에서 삭제하시겠습니까?`)) return;
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다.");
+
     const nextGrades = gradesList.filter(g => g !== gradeToDelete);
+    const { error } = await supabase.from('admin_status').upsert([{ week_key: `grades_${currentSchool}`, data: nextGrades }]);
+    if (error) return alert(`학년 삭제 저장에 실패했습니다.
+${error.message || "DB 오류"}`);
+
     setGradesList(nextGrades);
     localStorage.setItem(`sp_grade_list_${currentSchool}`, JSON.stringify(nextGrades));
-
+    setSelectedEventIds(new Set());
     if (selectedGrade === gradeToDelete) {
       setSelectedGrade(nextGrades[0]);
+      setSelectedClass(null);
       localStorage.setItem(`sp_last_grade_${currentSchool}`, nextGrades[0]);
+      localStorage.removeItem(`sp_last_class_${currentSchool}`);
     }
-    if (editingConfigGrade === gradeToDelete) {
-      setEditingConfigGrade(nextGrades[0]);
-    }
-    if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: `grades_${currentSchool}`, data: nextGrades }]);
-    }
+    if (editingConfigGrade === gradeToDelete) setEditingConfigGrade(nextGrades[0]);
     alert(`'${gradeToDelete}'이(가) 삭제되었습니다.`);
   };
 
   const handleSaveGradeConfig = async () => {
-    if (!isAdminMode) {
-      alert("학급 수 및 전담 구성 변경은 관리자 모드에서만 가능합니다.");
-      return;
-    }
+    if (!isAdminMode) return alert("학급 수 및 전담 구성 변경은 관리자 모드에서만 가능합니다.");
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다.");
     const updated = {
       ...gradeConfigs,
       [editingConfigGrade]: {
         classCount: Math.max(1, parseInt(cfgClassCount, 10) || 1),
-        specialists: cfgSpecialists
+        specialists: [...new Set(cfgSpecialists.map(v => String(v).trim()).filter(Boolean))]
       }
     };
+    const { error } = await supabase.from('admin_status').upsert([{ week_key: `configs_${currentSchool}`, data: updated }]);
+    if (error) return alert(`학급 구성 저장에 실패했습니다.
+${error.message || "DB 오류"}`);
     setGradeConfigs(updated);
     localStorage.setItem(`sp_grade_configs_${currentSchool}`, JSON.stringify(updated));
-    if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: `configs_${currentSchool}`, data: updated }]);
-    }
+    setSelectedEventIds(new Set());
     alert(`[${editingConfigGrade}] 학급 및 전담 설정이 적용되었습니다.`);
   };
 
   const handleChangeClassPw = async () => {
-    if (!isAdminMode) {
-      if (selectedPwGrade !== selectedGrade || selectedPwClass !== selectedClass) {
-        alert("일반 모드에서는 본인이 접속 중인 학급의 비밀번호만 변경할 수 있습니다.");
-        return;
-      }
+    if (!isAdminMode && (selectedPwGrade !== selectedGrade || selectedPwClass !== selectedClass)) {
+      return alert("일반 모드에서는 본인이 접속 중인 학급의 비밀번호만 변경할 수 있습니다.");
     }
-
-    const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
     const newPw = customNewPwInput.trim();
     const confirmPw = customNewPwConfirm.trim();
-    if (!newPw) {
-      alert("새 비밀번호를 입력해주세요.");
-      return;
+    if (!newPw) return alert("새 비밀번호를 입력해주세요.");
+    if (newPw !== confirmPw) return alert("새 비밀번호와 비밀번호 확인이 일치하지 않습니다.");
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다.");
+
+    try {
+      const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
+      const storedPw = await passwordForStorage(newPw);
+      const updated = { ...classPasswords, [targetKey]: storedPw };
+      const { error } = await supabase.from('admin_status').upsert([{ week_key: `class_pw_${currentSchool}`, data: updated }]);
+      if (error) return alert(`비밀번호 저장에 실패했습니다.
+${error.message || "DB 오류"}`);
+      setClassPasswords(updated);
+      setCustomNewPwInput("");
+      setCustomNewPwConfirm("");
+      alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 성공적으로 변경되었습니다.`);
+    } catch (err) {
+      alert(err.message || "비밀번호 처리 중 오류가 발생했습니다.");
     }
-    if (newPw !== confirmPw) {
-      alert("새 비밀번호와 비밀번호 확인이 일치하지 않습니다.");
-      return;
-    }
-    const updated = { ...classPasswords, [targetKey]: newPw };
-    setClassPasswords(updated);
-    localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(updated));
-    if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: `class_pw_${currentSchool}`, data: updated }]);
-    }
-    setCustomNewPwInput("");
-    setCustomNewPwConfirm("");
-    alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 성공적으로 변경되었습니다.`);
   };
 
   const handleAdminResetClassPw = async () => {
-    if (!isAdminMode) {
-      alert("비밀번호 초기화는 관리자 모드에서만 가능합니다.");
-      return;
-    }
+    if (!isAdminMode) return alert("비밀번호 초기화는 관리자 모드에서만 가능합니다.");
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다.");
     const targetKey = `${selectedPwGrade}_${selectedPwClass}`;
-    const updated = { ...classPasswords, [targetKey]: masterPassword };
+    let resetPw;
+    try { resetPw = await passwordForStorage(masterPassword); }
+    catch (err) { return alert(err.message || "비밀번호 처리 중 오류가 발생했습니다."); }
+    const updated = { ...classPasswords, [targetKey]: resetPw };
+    const { error } = await supabase.from('admin_status').upsert([{ week_key: `class_pw_${currentSchool}`, data: updated }]);
+    if (error) return alert(`비밀번호 초기화에 실패했습니다.
+${error.message || "DB 오류"}`);
     setClassPasswords(updated);
-    localStorage.setItem(`sp_class_pw_${currentSchool}`, JSON.stringify(updated));
-    if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: `class_pw_${currentSchool}`, data: updated }]);
-    }
     setCustomNewPwInput("");
     setCustomNewPwConfirm("");
     alert(`[${selectedPwGrade} ${selectedPwClass}] 비밀번호가 마스터 비밀번호로 초기화되었습니다.`);
   };
 
   const handleSaveMasterPassword = async () => {
-    if (!isAdminMode) {
-      alert("마스터 비밀번호 변경은 관리자 모드에서만 가능합니다.");
-      return;
-    }
+    if (!isAdminMode) return alert("마스터 비밀번호 변경은 관리자 모드에서만 가능합니다.");
     const trimmed = editingMasterPwInput.trim();
     const confirmTrimmed = editingMasterPwConfirm.trim();
+    if (!trimmed) return alert("새 마스터 비밀번호를 입력해주세요.");
+    if (trimmed !== confirmTrimmed) return alert("새 마스터 비밀번호와 확인란의 입력값이 일치하지 않습니다.");
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다.");
 
-    if (!trimmed) {
-      alert("새 마스터 비밀번호를 입력해주세요.");
-      return;
+    try {
+      const storedPw = await passwordForStorage(trimmed);
+      const { error } = await supabase.from('admin_status').upsert([{ week_key: `master_pw_${currentSchool}`, data: { password: storedPw } }]);
+      if (error) return alert(`마스터 비밀번호 저장에 실패했습니다.
+${error.message || "DB 오류"}`);
+      setMasterPassword(storedPw);
+      setEditingMasterPwInput("");
+      setEditingMasterPwConfirm("");
+      alert('마스터 관리자 비밀번호가 성공적으로 변경되었습니다.');
+    } catch (err) {
+      alert(err.message || "비밀번호 처리 중 오류가 발생했습니다.");
     }
-    if (trimmed !== confirmTrimmed) {
-      alert("새 마스터 비밀번호와 확인란의 입력값이 일치하지 않습니다. 다시 확인해주세요.");
-      return;
-    }
-
-    setMasterPassword(trimmed);
-    localStorage.setItem(`sp_master_pw_${currentSchool}`, trimmed);
-    if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: `master_pw_${currentSchool}`, data: { password: trimmed } }]);
-    }
-    setEditingMasterPwInput("");
-    setEditingMasterPwConfirm("");
-    alert('마스터 관리자 비밀번호가 성공적으로 변경되었습니다.');
   };
 
   const handleSaveNoticeModal = async () => {
     const key = getPeriodKey(noticeScope);
     const trimmed = modalNoticeText.trim();
-    const updated = { ...notices };
-    if (!trimmed) {
-      delete updated[key];
-    } else {
-      updated[key] = trimmed;
+    if (noticeScope === "grade" && !isAdminMode) {
+      return alert("학년 공통 공지사항은 관리자 모드에서만 저장할 수 있습니다.");
     }
-    setNotices(updated);
-    setNoticeModalOpen(false);
-    localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(updated));
-    if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: `notices_${currentSchool}`, data: updated }]);
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다. 인터넷 연결을 확인한 뒤 다시 시도해주세요.");
+
+    const previous = { ...notices };
+    const updated = { ...notices };
+    if (!trimmed) delete updated[key];
+    else updated[key] = trimmed;
+
+    const { error: noticeError } = await supabase.from('admin_status').upsert([
+      { week_key: `notices_${currentSchool}`, data: updated }
+    ]);
+    if (noticeError) {
+      console.error("공지사항 저장 실패:", noticeError);
+      return alert(`공지사항 저장에 실패했습니다.
+${noticeError.message || "DB 오류"}`);
     }
 
+    let linkedEvent = null;
     if (modalNoticeDate && trimmed) {
-      const noticeEvent = {
-        id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
+      const used = new Set(events.map(e => Number(e.id)));
+      let linkedPw;
+      try { linkedPw = await passwordForStorage(currentClassPassword); }
+      catch (err) {
+        await supabase.from('admin_status').upsert([{ week_key: `notices_${currentSchool}`, data: previous }]);
+        return alert(err.message || "비밀번호 처리 중 오류가 발생했습니다.");
+      }
+      linkedEvent = {
+        id: createEventId(used),
         school_name: currentSchool,
         date: modalNoticeDate,
         grade: selectedGrade,
-        dept: noticeScope === "grade" ? "학년 공통" : packClassDept(selectedClass || "1반", "학급 일반"),
-        content: `📢 ${trimmed}`,
+        dept: noticeScope === "grade" ? "학년 공통" : (selectedClass || "1반"),
+        content: encodeEventContent(`📢 ${trimmed}`, noticeScope === "grade" ? "학년 공통" : "학급 일반"),
         manager: noticeScope === "grade" ? "전체" : (selectedClass || ""),
-        password: currentClassPassword
+        password: linkedPw
       };
-      if (supabase) {
-        const { error } = await supabase.from('events').insert([noticeEvent]);
-        if (error) {
-          console.error("공지 일정 연동 실패:", error);
-          alert("공지 일정 저장 중 오류가 발생했습니다.");
-          return;
+
+      const { error: eventError } = await supabase.from('events').insert([linkedEvent]);
+      if (eventError) {
+        console.error("공지 일정 연동 실패:", eventError);
+        // 보상 롤백: 공지와 일정 중 하나만 저장되는 상태를 최대한 방지
+        const { error: rollbackError } = await supabase.from('admin_status').upsert([
+          { week_key: `notices_${currentSchool}`, data: previous }
+        ]);
+        if (rollbackError) {
+          console.error("공지 롤백 실패:", rollbackError);
+          return alert(`공지 일정 저장에 실패했고 공지 롤백도 실패했습니다. 관리자에게 알려주세요.
+${eventError.message || "DB 오류"}`);
         }
+        return alert(`공지 일정 저장에 실패하여 공지 저장도 되돌렸습니다.
+${eventError.message || "DB 오류"}`);
       }
-      setEvents(prev => [...prev, noticeEvent]);
     }
 
-    alert("공지사항이 저장되었습니다.");
+    setNotices(updated);
+    localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(updated));
+    if (linkedEvent) setEvents(prev => [...prev, linkedEvent]);
+    setModalNoticeText(trimmed);
+    setNoticeModalOpen(false);
+    alert(linkedEvent ? "공지사항과 일정이 저장되었습니다." : "공지사항이 저장되었습니다.");
   };
 
   const handleDeleteNoticeModal = async () => {
     const key = getPeriodKey(noticeScope);
+    if (noticeScope === "grade" && !isAdminMode) {
+      return alert("학년 공통 공지사항은 관리자 모드에서만 삭제할 수 있습니다.");
+    }
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다.");
     const updated = { ...notices };
     delete updated[key];
+    const { error } = await supabase.from('admin_status').upsert([{ week_key: `notices_${currentSchool}`, data: updated }]);
+    if (error) return alert(`공지사항 삭제 저장에 실패했습니다.
+${error.message || "DB 오류"}`);
     setNotices(updated);
     setModalNoticeText("");
     setModalNoticeDate("");
     setNoticeModalOpen(false);
     localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(updated));
-    if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: `notices_${currentSchool}`, data: updated }]);
-    }
     alert("공지사항이 삭제되었습니다.");
   };
 
@@ -953,21 +1086,39 @@ function App() {
     setSchoolAuthModalOpen(true);
   };
 
-  const confirmSchoolAuth = () => {
+  const confirmSchoolAuth = async () => {
     if (!pendingSchoolChange) return;
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다.");
     const { office, school } = pendingSchoolChange;
-    if (schoolAuthPwInput !== masterPassword) {
-      alert("관리자 비밀번호가 일치하지 않습니다. 틀렸습니다.");
-      return;
+    try {
+      const { data, error } = await supabase
+        .from('admin_status')
+        .select('week_key,data')
+        .eq('week_key', `master_pw_${school}`)
+        .maybeSingle();
+      if (error) {
+        console.error("대상 학교 인증정보 조회 실패:", error);
+        return alert(`학교 인증정보를 확인하지 못했습니다.
+${error.message || "DB 오류"}`);
+      }
+      const targetStoredPw = data?.data?.password || DEFAULT_INITIAL_PASSWORD;
+      if (!(await verifyPassword(schoolAuthPwInput, targetStoredPw))) {
+        return alert("선택한 학교의 관리자 비밀번호가 일치하지 않습니다.");
+      }
+
+      setSelectedEventIds(new Set());
+      setCurrentOffice(office);
+      setCurrentSchool(school);
+      localStorage.setItem("sp_office", office);
+      localStorage.setItem("sp_school", school);
+      setSelectedClass(null);
+      setSchoolAuthModalOpen(false);
+      setSchoolModalOpen(false);
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "학교 인증 중 오류가 발생했습니다.");
     }
-    setCurrentOffice(office);
-    setCurrentSchool(school);
-    localStorage.setItem("sp_office", office);
-    localStorage.setItem("sp_school", school);
-    setSelectedClass(null);
-    setSchoolAuthModalOpen(false);
-    setSchoolModalOpen(false);
-    window.location.reload();
   };
 
   const filteredEvents = useMemo(() => {
@@ -1026,14 +1177,14 @@ function App() {
   };
 
   const openDeleteModal = () => {
-    if (selectedEventIds.size === 0) {
-      alert("삭제할 일정을 체크박스로 선택해주세요.");
-      return;
+    if (selectedEventIds.size === 0) return alert("삭제할 일정을 체크박스로 선택해주세요.");
+    const selectedRows = events.filter(ev => selectedEventIds.has(ev.id));
+    const containsGradeCommon = selectedRows.some(ev => getEventCategory(ev) === "학년 공통");
+    if (containsGradeCommon && !isAdminMode) {
+      return alert("학년 공통 일정이 포함되어 있습니다. 학년 공통 일정 삭제는 관리자 모드에서만 가능합니다.");
     }
     if (isAdminMode) {
-      if (confirm(`관리자 권한으로 선택한 ${selectedEventIds.size}개의 일정을 즉시 삭제하시겠습니까?`)) {
-        confirmBatchDelete(true);
-      }
+      if (confirm(`관리자 권한으로 선택한 ${selectedEventIds.size}개의 일정을 삭제하시겠습니까?`)) confirmBatchDelete(true);
       return;
     }
     setDeletePwInput("");
@@ -1042,24 +1193,33 @@ function App() {
   };
 
   const confirmBatchDelete = async (forceAdmin = false) => {
-    if (!forceAdmin && !isAdminMode && deletePwInput !== currentClassPassword && deletePwInput !== masterPassword) {
-      setDeletePwError("비밀번호가 일치하지 않습니다. 틀렸습니다.");
-      alert("비밀번호가 일치하지 않습니다.");
+    const selectedRows = events.filter(ev => selectedEventIds.has(ev.id));
+    if (selectedRows.length === 0) return;
+    if (selectedRows.some(ev => getEventCategory(ev) === "학년 공통") && !isAdminMode) {
+      setDeletePwError("학년 공통 일정은 관리자만 삭제할 수 있습니다.");
       return;
     }
-    const idsArr = Array.from(selectedEventIds);
-    if (supabase) {
-      const { error } = await supabase.from('events').delete().in('id', idsArr);
-      if (error) {
-        console.error("삭제 실패:", error);
-        alert("일정 삭제 중 오류가 발생했습니다.");
-        return;
+    if (!forceAdmin && !isAdminMode) {
+      try {
+        const classOk = await verifyPassword(deletePwInput, currentClassPassword);
+        const masterOk = await verifyPassword(deletePwInput, masterPassword);
+        if (!classOk && !masterOk) {
+          setDeletePwError("비밀번호가 일치하지 않습니다.");
+          return;
+        }
+      } catch (err) {
+        return setDeletePwError(err.message || "비밀번호 확인 오류");
       }
     }
-    setEvents(prev => prev.filter(ev => !selectedEventIds.has(ev.id)));
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다.");
+    const idsArr = selectedRows.map(ev => ev.id);
+    const { error } = await supabase.from('events').delete().in('id', idsArr);
+    if (error) return alert(`일정 삭제 중 오류가 발생했습니다.
+${error.message || "DB 오류"}`);
+    setEvents(prev => prev.filter(ev => !idsArr.includes(ev.id)));
     setSelectedEventIds(new Set());
     setDeleteModalOpen(false);
-    alert("선택한 일정이 안전하게 삭제되었습니다.");
+    alert("선택한 일정이 삭제되었습니다.");
   };
 
   const downloadCsvTemplate = () => {
@@ -1129,28 +1289,30 @@ function App() {
 
   const handleConfirmBatchUpload = async () => {
     if (csvParsedData.length === 0) return;
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다. 인터넷 연결을 확인한 뒤 다시 시도해주세요.");
+    let uploadPassword;
+    try { uploadPassword = await passwordForStorage(currentClassPassword); }
+    catch (err) { return alert(err.message || "비밀번호 처리 중 오류가 발생했습니다."); }
+    const usedIds = new Set(events.map(e => Number(e.id)));
     const newEvents = csvParsedData.map(item => {
       const csvCategory = EVENT_CATEGORIES.includes(item.dept) ? item.dept : "학습";
       const isCommon = csvCategory === "학년 공통";
       return {
-        id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
+        id: createEventId(usedIds),
         school_name: currentSchool,
         grade: selectedGrade,
-        dept: isCommon ? "학년 공통" : packClassDept(selectedClass || activeClassList[0] || "1반", csvCategory),
+        dept: isCommon ? "학년 공통" : (selectedClass || activeClassList[0] || "1반"),
         date: item.date,
-        content: item.content,
+        content: encodeEventContent(item.content, csvCategory),
         manager: isCommon ? (item.manager || "전체") : (item.manager || ""),
-        password: currentClassPassword
+        password: uploadPassword
       };
     });
-
-    if (supabase) {
-      const { error } = await supabase.from('events').insert(newEvents);
-      if (error) {
-        console.error("CSV 일괄 업로드 실패:", error);
-        alert("데이터베이스 저장에 실패했습니다. 다시 시도해주세요.");
-        return;
-      }
+    const { error } = await supabase.from('events').insert(newEvents);
+    if (error) {
+      console.error("CSV 일괄 업로드 실패:", error);
+      alert(`데이터베이스 저장에 실패했습니다.\n${error.message || "오류 내용을 확인해주세요."}`);
+      return;
     }
     setEvents(prev => [...prev, ...newEvents]);
     setCsvModalOpen(false);
@@ -1212,7 +1374,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
           const badgeLabel = getEventCategory(ev);
           const isCommon = badgeLabel === "학년 공통";
           const targetStr = isCommon ? (ev.manager && ev.manager !== "전체" ? ` [${ev.manager}]` : " [전체]") : "";
-          const contentText = `[${badgeLabel}]${targetStr} ${ev.content}`;
+          const contentText = `[${badgeLabel}]${targetStr} ${getEventContent(ev)}`;
           const managerText = !isCommon && ev.manager ? ev.manager : "-";
           htmlTableContent += `
 <tr>
@@ -1269,10 +1431,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     content: "",
     manager: "",
     password: "",
-    schedules: [defaultScheduleRowForForm(ymd(today))],
-    repeatType: "none",
-    repeatEndDate: ymd(addMonths(today, 1)),
-    repeatCycles: [{ date: ymd(today) }]
+    schedules: [defaultScheduleRowForForm(ymd(today))]
   };
 
   const [eventModal, setEventModal] = useState(null);
@@ -1282,17 +1441,15 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
 
   const openAddEvent = (dateStr) => {
     const baseDate = dateStr || ymd(today);
-    const defaultEnd = ymd(addMonths(new Date(baseDate), 1));
-    const initialCycles = [{ date: baseDate }];
-    const autoCategory = "학년 공통";
-    
+    const canPasteClassEvent = copiedEvent && (getEventCategory(copiedEvent) === "학년 공통" || !!selectedClass);
+    const pastedCategory = canPasteClassEvent ? getEventCategory(copiedEvent) : "학년 공통";
     setForm({
       ...emptyForm,
       targetGrade: selectedGrade,
-      category: autoCategory,
-      schedules: [defaultScheduleRowForForm(baseDate)],
-      repeatEndDate: defaultEnd,
-      repeatCycles: initialCycles
+      category: pastedCategory,
+      content: canPasteClassEvent ? getEventContent(copiedEvent) : "",
+      manager: canPasteClassEvent && pastedCategory !== "학년 공통" ? (copiedEvent.manager || "") : "",
+      schedules: [defaultScheduleRowForForm(baseDate)]
     });
     setEventModal({ mode: "add" });
   };
@@ -1304,17 +1461,14 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     setForm({
       targetGrade: ev.grade || selectedGrade,
       category: cat,
-      content: ev.content,
+      content: getEventContent(ev),
       manager: !isGradeCommon ? (ev.manager || "") : "",
-      password: ev.password || "",
+      password: "",
       schedules: [{
         date: ev.date,
         targetType: isCustomTarget ? "custom" : "all",
         selectedTargets: isCustomTarget ? ev.manager.split(",").map(v => v.trim()).filter(Boolean) : [...activeClassList]
-      }],
-      repeatType: "none",
-      repeatEndDate: ev.date,
-      repeatCycles: [{ date: ev.date }]
+      }]
     });
     setPwCheckInput("");
     setPwCheckError("");
@@ -1326,12 +1480,23 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     
     const targetGrade = form.targetGrade || selectedGrade;
     const isGradeCommon = form.category === "학년 공통";
+    if (isGradeCommon && !isAdminMode) {
+      setPwCheckError("학년 공통 일정은 관리자 모드에서만 등록/수정할 수 있습니다.");
+      return;
+    }
     
-    let finalDept = isGradeCommon ? "학년 공통" : packClassDept(selectedClass || activeClassList[0] || "1반", form.category || "학급 일반");
-    const eventPassword = form.password.trim() || currentClassPassword;
+    let finalDept = isGradeCommon ? "학년 공통" : (selectedClass || activeClassList[0] || "1반");
+    let eventPassword;
+    try { eventPassword = await passwordForStorage(currentClassPassword); }
+    catch (err) { return alert(err.message || "비밀번호 처리 중 오류가 발생했습니다."); }
+
+    if (!isGradeCommon && !selectedClass) {
+      return alert("학급 전용 일정은 먼저 학급을 선택한 뒤 등록해주세요.");
+    }
 
     if (eventModal.mode === "add") {
       const newEvents = [];
+      const usedIds = new Set(events.map(e => Number(e.id)));
       const schedulesToProcess = isGradeCommon ? form.schedules : [{
         date: form.schedules[0].date,
         targetType: "custom",
@@ -1347,33 +1512,49 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
         }
 
         newEvents.push({
-          id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
+          id: createEventId(usedIds),
           school_name: currentSchool,
           date: row.date,
           grade: targetGrade,
           dept: finalDept,
-          content: form.content,
+          content: encodeEventContent(form.content, form.category),
           manager: finalManager,
           password: eventPassword
         });
       }
 
-      if (supabase) {
-        const { error } = await supabase.from('events').insert(newEvents);
-        if (error) {
-          console.error("일정 저장 실패:", error);
-          alert("일정 저장 중 오류가 발생했습니다.");
-          return;
-        }
+      if (!supabase) {
+        alert("데이터베이스에 연결되지 않았습니다. 인터넷 연결을 확인한 뒤 다시 시도해주세요.");
+        return;
+      }
+      const { error } = await supabase.from('events').insert(newEvents);
+      if (error) {
+        console.error("일정 저장 실패:", error);
+        alert(`일정 저장 중 오류가 발생했습니다.\n${error.message || "오류 내용을 확인해주세요."}`);
+        return;
       }
       setEvents(prev => [...prev, ...newEvents]);
       setEventModal(null);
       alert(`총 ${newEvents.length}건의 일정이 등록되었습니다.`);
     } else {
-      if (!isAdminMode && pwCheckInput !== eventModal.data.password && pwCheckInput !== currentClassPassword && pwCheckInput !== masterPassword) {
-        setPwCheckError("비밀번호가 일치하지 않습니다. 틀렸습니다.");
-        alert("비밀번호가 틀렸습니다.");
+      const originalIsCommon = getEventCategory(eventModal.data) === "학년 공통";
+      if (originalIsCommon && !isAdminMode) {
+        setPwCheckError("학년 공통 일정은 관리자만 수정할 수 있습니다.");
         return;
+      }
+      if (!isAdminMode) {
+        try {
+          const eventOk = await verifyPassword(pwCheckInput, eventModal.data.password);
+          const classOk = await verifyPassword(pwCheckInput, currentClassPassword);
+          const masterOk = await verifyPassword(pwCheckInput, masterPassword);
+          if (!eventOk && !classOk && !masterOk) {
+            setPwCheckError("비밀번호가 일치하지 않습니다.");
+            return;
+          }
+        } catch (err) {
+          setPwCheckError(err.message || "비밀번호 확인 오류");
+          return;
+        }
       }
       const row = form.schedules[0];
       let finalManager = form.manager;
@@ -1387,16 +1568,18 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
         date: row.date,
         grade: targetGrade,
         dept: finalDept,
-        content: form.content,
+        content: encodeEventContent(form.content, form.category),
         manager: finalManager
       };
-      if (supabase) {
-        const { error } = await supabase.from('events').update(updatePayload).eq('id', eventModal.data.id);
-        if (error) {
-          console.error("일정 수정 실패:", error);
-          alert("일정 수정 중 오류가 발생했습니다.");
-          return;
-        }
+      if (!supabase) {
+        alert("데이터베이스에 연결되지 않았습니다. 인터넷 연결을 확인한 뒤 다시 시도해주세요.");
+        return;
+      }
+      const { error } = await supabase.from('events').update(updatePayload).eq('id', eventModal.data.id);
+      if (error) {
+        console.error("일정 수정 실패:", error);
+        alert(`일정 수정 중 오류가 발생했습니다.\n${error.message || "오류 내용을 확인해주세요."}`);
+        return;
       }
       setEvents(prev => prev.map(e => e.id === eventModal.data.id ? { ...e, ...updatePayload } : e));
       setEventModal(null);
@@ -1405,20 +1588,31 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
   };
 
   const deleteEvent = async () => {
-    if (!isAdminMode && pwCheckInput !== eventModal.data.password && pwCheckInput !== currentClassPassword && pwCheckInput !== masterPassword) {
-      setPwCheckError("비밀번호가 일치하지 않습니다. 틀렸습니다.");
-      alert("비밀번호가 틀렸습니다.");
+    if (!eventModal?.data) return;
+    if (getEventCategory(eventModal.data) === "학년 공통" && !isAdminMode) {
+      setPwCheckError("학년 공통 일정은 관리자만 삭제할 수 있습니다.");
       return;
     }
-    if (supabase) {
-      const { error } = await supabase.from('events').delete().eq('id', eventModal.data.id);
-      if (error) {
-        console.error("일정 삭제 실패:", error);
-        alert("일정 삭제 중 오류가 발생했습니다.");
+    if (!isAdminMode) {
+      try {
+        const eventOk = await verifyPassword(pwCheckInput, eventModal.data.password);
+        const classOk = await verifyPassword(pwCheckInput, currentClassPassword);
+        const masterOk = await verifyPassword(pwCheckInput, masterPassword);
+        if (!eventOk && !classOk && !masterOk) {
+          setPwCheckError("비밀번호가 일치하지 않습니다.");
+          return;
+        }
+      } catch (err) {
+        setPwCheckError(err.message || "비밀번호 확인 오류");
         return;
       }
     }
+    if (!supabase) return alert("데이터베이스에 연결되지 않았습니다.");
+    const { error } = await supabase.from('events').delete().eq('id', eventModal.data.id);
+    if (error) return alert(`일정 삭제 중 오류가 발생했습니다.
+${error.message || "DB 오류"}`);
     setEvents(prev => prev.filter(e => e.id !== eventModal.data.id));
+    setSelectedEventIds(prev => { const next = new Set(prev); next.delete(eventModal.data.id); return next; });
     setEventModal(null);
     alert("일정이 삭제되었습니다.");
   };
@@ -1482,7 +1676,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                   <div className="flex flex-wrap gap-1 max-w-[260px] justify-start md:justify-end">
                     {todayEvents.slice(0, 3).map((ev, i) => (
                       <span key={i} className="rounded bg-white/90 border border-violet-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-700 truncate max-w-[220px]">
-                        {ev.content}
+                        {getEventContent(ev)}
                       </span>
                     ))}
                   </div>
@@ -1576,7 +1770,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                 {todayEvents.map((ev, i) => (
                   <div key={i} className="flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-1.5 text-slate-800 text-xs font-bold shadow-xs">
                     <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700 font-extrabold">{getEventCategory(ev)}</span>
-                    <span>{ev.content}</span>
+                    <span>{getEventContent(ev)}</span>
                   </div>
                 ))}
               </div>
@@ -2485,6 +2679,18 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
               )}
 
               <div className="flex items-center gap-2 pt-2 border-t">
+                {eventModal.mode === "edit" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCopiedEvent({ ...eventModal.data });
+                      setEventModal(null);
+                    }}
+                    className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-bold text-violet-700 hover:bg-violet-100"
+                  >
+                    복사
+                  </button>
+                )}
                 {eventModal.mode === "edit" && (
                   <button
                     type="button"
