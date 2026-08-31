@@ -1029,51 +1029,26 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
       const hol = (customHolidays && customHolidays[dStr]) || FIXED_HOLIDAYS[dStr] || FIXED_HOLIDAYS[dStr.slice(5)] || "";
       const evList = sortEvents(eventsByDate[dStr] || []);
 
-      // [핵심 연동] 해당 날짜가 속한 월의 학년 공통공지를 엑셀 출력 테이블에도 자동으로 포함시킵니다.
-      const dObj = new Date(d);
-      const rowMonthKey = getPeriodKey("grade", dObj);
-      const rowGradeNotice = (notices[rowMonthKey] || "").trim();
-
-      let cellContentArray = [];
-      if (hol) cellContentArray.push(`[휴일] ${hol}`);
-      if (rowGradeNotice) cellContentArray.push(`[학년 공통공지]\n${rowGradeNotice}`);
-
       if (evList.length === 0) {
-        if (cellContentArray.length > 0) {
-          htmlTableContent += `
+        htmlTableContent += `
 <tr>
 <td style="text-align: center;">${dayNum}</td>
 <td style="text-align: center;">${dowStr}</td>
-<td>${escapeToExcelCell(cellContentArray.join("\n\n"))}</td>
+<td>${hol ? escapeToExcelCell(`[휴일] ${hol}`) : ""}</td>
 <td style="text-align: center;">-</td>
 </tr>`;
-        } else {
-          htmlTableContent += `
-<tr>
-<td style="text-align: center;">${dayNum}</td>
-<td style="text-align: center;">${dowStr}</td>
-<td></td>
-<td style="text-align: center;">-</td>
-</tr>`;
-        }
       } else {
-        evList.forEach((ev, evIdx) => {
+        evList.forEach(ev => {
           const badgeLabel = ev.dept || "학습";
           const isCommon = badgeLabel === "학년 공통";
           const targetStr = isCommon ? (ev.manager && ev.manager !== "전체" ? ` [${ev.manager}]` : " [전체]") : "";
           const contentText = `[${badgeLabel}]${targetStr} ${ev.content}`;
           const managerText = !isCommon && ev.manager ? ev.manager : "-";
-
-          let finalColText = contentText;
-          if (evIdx === 0 && cellContentArray.length > 0) {
-            finalColText = [...cellContentArray, contentText].join("\n\n");
-          }
-
           htmlTableContent += `
 <tr>
 <td style="text-align: center;">${dayNum}</td>
 <td style="text-align: center;">${dowStr}</td>
-<td>${escapeToExcelCell(finalColText)}</td>
+<td>${escapeToExcelCell(contentText)}</td>
 <td style="text-align: center;">${escapeToExcelCell(managerText)}</td>
 </tr>`;
         });
@@ -1477,23 +1452,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
           {(tab === "month" ? monthDays : weekDates).map((d, idx) => {
             const dStr = ymd(d);
             const dayEvents = eventsByDate[dStr] || [];
-            
-            // [핵심 연동 구현] 해당 날짜가 속한 월의 학년 공통공지를 자동으로 불러와서 일정 목록(dayEvents) 상단에 뱃지와 함께 깔끔하게 띄워줍니다!
-            const dObj = new Date(d);
-            const rowMonthKey = getPeriodKey("grade", dObj);
-            const rowGradeNotice = (notices[rowMonthKey] || "").trim();
-
-            const combinedEventsForDay = [
-              ...(rowGradeNotice ? [{
-                id: `notice_badge_${dStr}_${rowGradeNotice}`,
-                dept: "학년 공통",
-                content: `📢 [학년 공통공지] ${rowGradeNotice}`,
-                manager: "전체"
-              }] : []),
-              ...dayEvents
-            ];
-
-            const evIds = combinedEventsForDay.map(e => e.id);
+            const evIds = dayEvents.map(e => e.id);
             const isDateSelected = evIds.length > 0 && evIds.every(id => selectedEventIds.has(id));
 
             return (
@@ -1501,7 +1460,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                 key={dStr}
                 date={d}
                 today={today}
-                events={combinedEventsForDay}
+                events={dayEvents}
                 isLast={idx === (tab === "month" ? monthDays : weekDates).length - 1}
                 onAddEvent={openAddEvent}
                 onOpenEvent={openEditEvent}
