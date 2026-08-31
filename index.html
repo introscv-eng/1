@@ -148,6 +148,16 @@ const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); r
 // 안전한 월 이동 함수 (항상 해당 월의 1일을 기준으로 계산하여 날짜 꼬임 방지)
 const safeAddMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
 
+// 일반적인 월 이동: 원래 일자를 최대한 유지하고, 대상 월에 해당 일자가 없으면 말일로 보정
+const addMonths = (d, n) => {
+  const src = new Date(d);
+  const day = src.getDate();
+  const result = new Date(src.getFullYear(), src.getMonth() + n, 1);
+  const lastDay = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(day, lastDay));
+  return result;
+};
+
 const startOfWeekMon = (d) => {
   const r = new Date(d);
   const day = r.getDay();
@@ -232,11 +242,37 @@ const UploadCloudIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
 );
 
+// dept 필드 호환 규칙
+// - 학년 공통: "학년 공통"
+// - 새 학급 일정: "1반::학습" 형태로 학급명과 카테고리를 함께 저장
+// - 기존 데이터: "1반"처럼 학급명만 저장된 값도 계속 지원
+const DEPT_SEP = "::";
+const packClassDept = (className, category = "학급 일반") => `${className || "1반"}${DEPT_SEP}${category || "학급 일반"}`;
+
+function getEventCategory(ev) {
+  const dept = (ev && ev.dept) || "";
+  if (dept === "학년 공통") return "학년 공통";
+  if (dept.includes(DEPT_SEP)) {
+    const [, category] = dept.split(DEPT_SEP);
+    return category || "학급 일반";
+  }
+  if (EVENT_CATEGORIES.includes(dept)) return dept;
+  return "학급 일반";
+}
+
+function getEventClass(ev) {
+  const dept = (ev && ev.dept) || "";
+  if (!dept || dept === "학년 공통") return "";
+  if (dept.includes(DEPT_SEP)) return dept.split(DEPT_SEP)[0] || "";
+  if (EVENT_CATEGORIES.includes(dept)) return "";
+  return dept;
+}
+
 function sortEvents(events) {
   const catOrder = EVENT_CATEGORIES;
   return [...events].sort((a, b) => {
-    const catA = a.dept || "학습";
-    const catB = b.dept || "학습";
+    const catA = getEventCategory(a);
+    const catB = getEventCategory(b);
     const idxA = catOrder.indexOf(catA);
     const idxB = catOrder.indexOf(catB);
     if (idxA !== idxB) return (idxA !== -1 ? idxA : 999) - (idxB !== -1 ? idxB : 999);
@@ -283,7 +319,7 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
         ) : (
           sortedEvents.map((ev) => {
             const isChecked = selectedEventIds.has(ev.id);
-            const badgeLabel = ev.dept || "학습";
+            const badgeLabel = getEventCategory(ev);
             const isGradeCommon = badgeLabel === "학년 공통";
             const targetBadgeText = isGradeCommon ? (ev.manager && ev.manager !== "" ? ev.manager : "전체") : null;
             return (
@@ -813,7 +849,7 @@ function App() {
         school_name: currentSchool,
         date: modalNoticeDate,
         grade: selectedGrade,
-        dept: noticeScope === "grade" ? "학년 공통" : (selectedClass || "1반"),
+        dept: noticeScope === "grade" ? "학년 공통" : packClassDept(selectedClass || "1반", "학급 일반"),
         content: `📢 ${trimmed}`,
         manager: noticeScope === "grade" ? "전체" : (selectedClass || ""),
         password: currentClassPassword
@@ -881,14 +917,18 @@ function App() {
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (e.grade !== selectedGrade) return false;
-      const cat = e.dept || "학습";
+      const cat = getEventCategory(e);
       if (cat === "학년 공통") {
         if (!selectedClass) return true;
         if (!e.manager || e.manager === "전체" || e.manager === "") return true;
         const targets = (e.manager || "").split(",").map(v => v.trim());
         return targets.includes(selectedClass);
       }
-      return selectedClass ? e.dept === selectedClass : false;
+      if (!selectedClass) return false;
+      const eventClass = getEventClass(e);
+      // 기존 CSV 데이터처럼 dept가 카테고리만 있는 경우 학급 정보가 유실되어 있으므로
+      // 공통 화면에는 노출하지 않고, 새 업로드부터는 학급+카테고리 형식으로 저장한다.
+      return eventClass === selectedClass;
     });
   }, [events, selectedGrade, selectedClass]);
 
@@ -986,7 +1026,12 @@ function App() {
     for (let j = 0; j < line.length; j++) {
       const char = line[j];
       if (char === '"') {
-        insideQuotes = !insideQuotes;
+        if (insideQuotes && line[j + 1] === '"') {
+          entry += '"';
+          j++;
+        } else {
+          insideQuotes = !insideQuotes;
+        }
       } else if (char === ',' && !insideQuotes) {
         row.push(entry.trim());
         entry = '';
@@ -1030,16 +1075,20 @@ function App() {
 
   const handleConfirmBatchUpload = async () => {
     if (csvParsedData.length === 0) return;
-    const newEvents = csvParsedData.map(item => ({
-      id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
-      school_name: currentSchool,
-      grade: selectedGrade,
-      dept: item.dept,
-      date: item.date,
-      content: item.content,
-      manager: item.manager,
-      password: currentClassPassword
-    }));
+    const newEvents = csvParsedData.map(item => {
+      const csvCategory = EVENT_CATEGORIES.includes(item.dept) ? item.dept : "학습";
+      const isCommon = csvCategory === "학년 공통";
+      return {
+        id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
+        school_name: currentSchool,
+        grade: selectedGrade,
+        dept: isCommon ? "학년 공통" : packClassDept(selectedClass || activeClassList[0] || "1반", csvCategory),
+        date: item.date,
+        content: item.content,
+        manager: isCommon ? (item.manager || "전체") : (item.manager || ""),
+        password: currentClassPassword
+      };
+    });
 
     if (supabase) {
       const { error } = await supabase.from('events').insert(newEvents);
@@ -1106,7 +1155,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
 </tr>`;
       } else {
         evList.forEach(ev => {
-          const badgeLabel = ev.dept || "학습";
+          const badgeLabel = getEventCategory(ev);
           const isCommon = badgeLabel === "학년 공통";
           const targetStr = isCommon ? (ev.manager && ev.manager !== "전체" ? ` [${ev.manager}]` : " [전체]") : "";
           const contentText = `[${badgeLabel}]${targetStr} ${ev.content}`;
@@ -1195,7 +1244,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
   };
 
   const openEditEvent = (ev) => {
-    const cat = ev.dept || "학습";
+    const cat = getEventCategory(ev);
     const isGradeCommon = cat === "학년 공통";
     const isCustomTarget = isGradeCommon && ev.manager && ev.manager !== "전체";
     setForm({
@@ -1207,7 +1256,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
       schedules: [{
         date: ev.date,
         targetType: isCustomTarget ? "custom" : "all",
-        selectedTargets: isCustomTarget ? ev.manager.split(",") : [...activeClassList]
+        selectedTargets: isCustomTarget ? ev.manager.split(",").map(v => v.trim()).filter(Boolean) : [...activeClassList]
       }],
       repeatType: "none",
       repeatEndDate: ev.date,
@@ -1221,10 +1270,10 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
   const saveEvent = async () => {
     if (!form.content.trim()) return;
     
-    const targetGrade = selectedGrade;
+    const targetGrade = form.targetGrade || selectedGrade;
     const isGradeCommon = form.category === "학년 공통";
     
-    let finalDept = isGradeCommon ? "학년 공통" : (selectedClass || activeClassList[0] || "1반");
+    let finalDept = isGradeCommon ? "학년 공통" : packClassDept(selectedClass || activeClassList[0] || "1반", form.category || "학급 일반");
     const eventPassword = form.password.trim() || currentClassPassword;
 
     if (eventModal.mode === "add") {
@@ -1472,7 +1521,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
               <div className="flex flex-wrap gap-2 pt-1">
                 {todayEvents.map((ev, i) => (
                   <div key={i} className="flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-1.5 text-slate-800 text-xs font-bold shadow-xs">
-                    <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700 font-extrabold">{ev.dept}</span>
+                    <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700 font-extrabold">{getEventCategory(ev)}</span>
                     <span>{ev.content}</span>
                   </div>
                 ))}
