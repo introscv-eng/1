@@ -23,7 +23,7 @@ body { font-family: 'Inter', sans-serif; }
 
 <script type="text/babel">
 const SUPABASE_URL = "https://tygsgurwjpojzzrtyhrq.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzlyMzI2OH0.VR6311j_PMhetS3pY3RsIT6G3sFFZZIZNjEg39dtn6s";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z3NndXJ3anBvanp6cnR5aHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDcyNjgsImV4cCI6MjEwMzlyMzI2OH0.VR6311j_PMhetS3pY3RsIT6G3sFFZZIZNjEg39dtn6s";
 
 const { useState, useMemo, useEffect, useCallback } = React;
 
@@ -1116,10 +1116,9 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     const defaultEnd = ymd(addMonths(new Date(baseDate), 1));
     const initialCycles = [{ date: baseDate }];
     
-    // [지능형 컨텍스트 분기] 
-    // 만약 사용자가 학급 뷰(예: 6학년 1반)에 접속해 있다면 카테고리를 '학습'으로, 
-    // 학년 공통 뷰(selectedClass가 null)에 있다면 '학년 공통'으로 자동 세팅합니다.
-    const autoCategory = selectedClass ? "학습" : "학년 공통";
+    // [개선 포인트] 사용자가 어느 화면(1반이든 공통이든)에 있든 최초 기본 카테고리를 '학년 공통'으로 열어주어
+    // 필요하면 언제든 다른 학급을 다중 선택하거나 공통 행사를 등록할 수 있도록 유연하게 오픈합니다.
+    const autoCategory = "학년 공통";
     
     setForm({
       ...emptyForm,
@@ -1162,24 +1161,22 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     const targetGrade = selectedGrade;
     const isGradeCommon = form.category === "학년 공통";
     
-    // [핵심 로직 분기]
-    // 1) 학급 뷰(예: 6학년 1반)에서 등록하면 무조건 dept는 선택된 반 이름(예: '1반')으로 고정됩니다. (적용 대상 선택 필요 없음)
-    // 2) 학년 공통 뷰에서 등록할 때만 '학년 공통' 카테고리가 되며, 여러 날짜 및 학급 세트(schedules)를 다중 등록할 수 있습니다.
-    let finalDept = selectedClass ? selectedClass : (isGradeCommon ? "학년 공통" : (activeClassList[0] || "1반"));
-    if (isGradeCommon && !selectedClass) {
-      finalDept = "학년 공통";
-    }
-
+    // [핵심 개선] 
+    // 사용자가 '학년 공통' 카테고리를 선택했다면, 
+    // 현재 내가 1반에 접속해 있더라도 다른 반들을 다중 선택(또는 전체 공통)하여 등록할 수 있게 허용합니다.
+    // 만약 카테고리를 '학습'이나 '학급 일반' 등으로 바꿨을 때만 현재 접속 중인 내 반(selectedClass)에 고정됩니다.
+    let finalDept = isGradeCommon ? "학년 공통" : (selectedClass || activeClassList[0] || "1반");
     const eventPassword = form.password.trim() || currentClassPassword;
 
     if (eventModal.mode === "add") {
       const newEvents = [];
       
-      // 학년 공통이고 멀티 스케줄(다중 날짜/학급 세트)이 입력된 경우 각각 개별 이벤트로 분할 생성
+      // 학년 공통인 경우 사용자가 추가한 다중 날짜/학급 세트(schedules)를 각각 이벤트로 분할 생성
+      // 학급 일반/학습인 경우 현재 내 반 또는 지정된 반으로 생성
       const schedulesToProcess = isGradeCommon ? form.schedules : [{
         date: form.schedules[0].date,
         targetType: "custom",
-        selectedTargets: [selectedClass]
+        selectedTargets: [selectedClass || activeClassList[0]]
       }];
 
       for (const row of schedulesToProcess) {
@@ -1187,7 +1184,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
         if (isGradeCommon) {
           finalManager = row.targetType === "all" ? "전체" : row.selectedTargets.join(", ");
         } else {
-          finalManager = selectedClass;
+          finalManager = selectedClass || "";
         }
 
         newEvents.push({
@@ -2146,16 +2143,16 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                 </div>
               </div>
 
-              {/* [스마트 컨텍스트 UI] 학급 뷰에서는 자동 고정, 학년 공통 뷰에서는 다중 날짜·학급 추가 지원 */}
+              {/* [지능형 다중 학급·날짜 선택 인터페이스] 어떤 화면에 있든 '학년 공통'을 고르면 다중 반 선택이 가능해집니다 */}
               <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <FieldLabel>현재 등록 위치 및 대상 범위</FieldLabel>
+                  <FieldLabel>현재 등록 모드</FieldLabel>
                   <span className="text-[11px] font-extrabold text-violet-700">
-                    {selectedClass ? `[${selectedGrade} ${selectedClass}] 전용 일정` : `[${selectedGrade}] 학년 공통 일정`}
+                    {form.category === "학년 공통" ? `[${selectedGrade}] 학년 공통 다중 등록 모드` : `[${selectedGrade} ${selectedClass}] 학급 전용 모드`}
                   </span>
                 </div>
 
-                {form.category === "학년 공통" && !selectedClass && (
+                {form.category === "학년 공통" && (
                   <div className="space-y-3 pt-1 border-t border-violet-200">
                     <div className="flex items-center justify-between">
                       <FieldLabel>날짜 및 학급 세트별 다중 등록 (예: 8/31 1,2,3반 / 9/1 4,5,6반)</FieldLabel>
@@ -2269,8 +2266,8 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                 )}
               </div>
 
-              {/* 학년 공통 뷰이고 멀티 스케줄이 아닐 때 혹은 학급 뷰일 때 기본 단일 날짜 선택 */}
-              {!(form.category === "학년 공통" && !selectedClass) && (
+              {/* 학급 전용 모드일 때 단일 날짜 선택 */}
+              {form.category !== "학년 공통" && (
                 <div>
                   <FieldLabel>날짜 선택</FieldLabel>
                   <input
