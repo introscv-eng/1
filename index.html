@@ -1096,7 +1096,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
 
   const emptyForm = {
     targetGrade: selectedGrade,
-    category: selectedClass ? "학습" : "학년 공통",
+    category: "학년 공통", // 기본값을 '학년 공통'으로 설정하여 언제든 다중 선택이 가능하도록 함
     content: "",
     manager: "",
     password: "",
@@ -1116,8 +1116,8 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     const defaultEnd = ymd(addMonths(new Date(baseDate), 1));
     const initialCycles = [{ date: baseDate }];
     
-    // [개선 포인트] 사용자가 어느 화면(1반이든 공통이든)에 있든 최초 기본 카테고리를 '학년 공통'으로 열어주어
-    // 필요하면 언제든 다른 학급을 다중 선택하거나 공통 행사를 등록할 수 있도록 유연하게 오픈합니다.
+    // [개선 포인트] 사용자가 1반에 있든 공통 뷰에 있든 '일정 추가'를 누르면 
+    // 기본 카테고리를 '학년 공통'으로 열어주어 언제든 다중 반 선택 및 공통 행사를 등록할 수 있게 합니다.
     const autoCategory = "학년 공통";
     
     setForm({
@@ -1161,18 +1161,12 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     const targetGrade = selectedGrade;
     const isGradeCommon = form.category === "학년 공통";
     
-    // [핵심 개선] 
-    // 사용자가 '학년 공통' 카테고리를 선택했다면, 
-    // 현재 내가 1반에 접속해 있더라도 다른 반들을 다중 선택(또는 전체 공통)하여 등록할 수 있게 허용합니다.
-    // 만약 카테고리를 '학습'이나 '학급 일반' 등으로 바꿨을 때만 현재 접속 중인 내 반(selectedClass)에 고정됩니다.
     let finalDept = isGradeCommon ? "학년 공통" : (selectedClass || activeClassList[0] || "1반");
     const eventPassword = form.password.trim() || currentClassPassword;
 
     if (eventModal.mode === "add") {
       const newEvents = [];
       
-      // 학년 공통인 경우 사용자가 추가한 다중 날짜/학급 세트(schedules)를 각각 이벤트로 분할 생성
-      // 학급 일반/학습인 경우 현재 내 반 또는 지정된 반으로 생성
       const schedulesToProcess = isGradeCommon ? form.schedules : [{
         date: form.schedules[0].date,
         targetType: "custom",
@@ -2143,7 +2137,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                 </div>
               </div>
 
-              {/* [지능형 다중 학급·날짜 선택 인터페이스] 어떤 화면에 있든 '학년 공통'을 고르면 다중 반 선택이 가능해집니다 */}
+              {/* [최종 개선] 어떤 화면(1반이든 공통이든)에 있든 카테고리를 '학년 공통'으로 바꾸면 즉시 다중 날짜 및 학급 선택 세트가 나타납니다 */}
               <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <FieldLabel>현재 등록 모드</FieldLabel>
