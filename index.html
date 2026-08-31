@@ -1115,6 +1115,8 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     const baseDate = dateStr || ymd(today);
     const defaultEnd = ymd(addMonths(new Date(baseDate), 1));
     const initialCycles = [{ date: baseDate }];
+    // [수정 포인트] 만약 사용자가 현재 특정 반(예: 6학년 1반)에 들어와 있다면 기본 카테고리를 '학습'으로, 
+    // 학년 공통 뷰에 있다면 '학년 공통'으로 자동 세팅합니다.
     const autoCategory = selectedClass ? "학습" : "학년 공통";
     setForm({
       ...emptyForm,
@@ -1153,9 +1155,18 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
 
   const saveEvent = async () => {
     if (!form.content.trim()) return;
-    const targetGrade = isAdminMode ? form.targetGrade : selectedGrade;
+    
+    // [수정 포인트] 사용자가 현재 보고 있는 학년과 학급 맥락을 그대로 반영
+    const targetGrade = selectedGrade;
     const isGradeCommon = form.category === "학년 공통";
-    const defaultTargetDept = selectedClass || (activeClassList[0] || "1반");
+    
+    // 만약 학년 공통 뷰(selectedClass가 null)에서 '학습'이나 '업무' 등을 등록하면 현재 1반 혹은 기본값으로 지정되도록 방어
+    // 반면 학급 뷰(selectedClass가 '1반')에서 등록하면 무조건 dept는 '1반'으로 고정됩니다.
+    let finalDept = selectedClass ? selectedClass : (isGradeCommon ? "학년 공통" : (activeClassList[0] || "1반"));
+    if (isGradeCommon) {
+      finalDept = "학년 공통";
+    }
+
     const eventPassword = form.password.trim() || currentClassPassword;
 
     if (eventModal.mode === "add") {
@@ -1168,16 +1179,18 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
           const rowDate = new Date(row.date);
           const targetDateObj = addDays(rowDate, dayDiff);
           const targetDateStr = ymd(targetDateObj);
+          
           let finalManager = form.manager;
           if (isGradeCommon) {
             finalManager = row.targetType === "all" ? "전체" : row.selectedTargets.join(", ");
           }
+
           newEvents.push({
             id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
             school_name: currentSchool,
             date: targetDateStr,
             grade: targetGrade,
-            dept: isGradeCommon ? "학년 공통" : defaultTargetDept,
+            dept: finalDept,
             content: form.content,
             manager: finalManager,
             password: eventPassword
@@ -1204,7 +1217,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
       const updatePayload = {
         date: row.date,
         grade: targetGrade,
-        dept: isGradeCommon ? "학년 공통" : (eventModal.data.dept || defaultTargetDept),
+        dept: finalDept,
         content: form.content,
         manager: finalManager
       };
@@ -2125,27 +2138,16 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                 </div>
               </div>
 
-              {/* [수정 포인트] 학년 공통 및 학년별/학급별 대상 선택 메뉴 완전 복구 */}
+              {/* [지능형 컨텍스트 복구] 현재 선택된 학년/반 정보 자동 적용 안내 및 학년 공통 세부 선택 */}
               <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <FieldLabel>적용 대상 선택 (학년 / 학급)</FieldLabel>
-                  <span className="text-[11px] font-bold text-violet-700">대상 지정</span>
+                  <FieldLabel>현재 등록 위치 및 대상 범위</FieldLabel>
+                  <span className="text-[11px] font-extrabold text-violet-700">
+                    {selectedClass ? `[${selectedGrade} ${selectedClass}] 전용 일정` : `[${selectedGrade}] 학년 공통 일정`}
+                  </span>
                 </div>
 
-                <div>
-                  <FieldLabel>적용 학년</FieldLabel>
-                  <select
-                    value={form.targetGrade}
-                    onChange={(e) => setForm({ ...form, targetGrade: e.target.value })}
-                    className={inputCls}
-                  >
-                    {gradesList.map(g => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {form.category === "학년 공통" && (
+                {form.category === "학년 공통" && !selectedClass && (
                   <div className="space-y-2 pt-1 border-t border-violet-200">
                     <FieldLabel>학년 공통 세부 대상 범위</FieldLabel>
                     <div className="flex gap-4 text-xs font-bold text-slate-700">
