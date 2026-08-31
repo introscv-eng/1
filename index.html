@@ -144,7 +144,7 @@ const pad2 = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const sameDay = (a, b) => ymd(a) === ymd(b);
 const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
-const addMonths = (d, n) => { const r = new Date(d); r.setMonth(r.getMonth() + n); return r; };
+const safeAddMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
 
 const startOfWeekMon = (d) => {
   const r = new Date(d);
@@ -516,11 +516,13 @@ function App() {
   const [noticeModalOpen, setNoticeModalOpen] = useState(false);
   const [noticeScope, setNoticeScope] = useState("grade");
   const [modalNoticeText, setModalNoticeText] = useState("");
+  const [modalNoticeDate, setModalNoticeDate] = useState(""); // [선택적 날짜 지정 상태 추가]
 
   const openNoticeEditModal = () => {
     const currentScope = selectedClass ? "class" : "grade";
     setNoticeScope(currentScope);
     setModalNoticeText(notices[getPeriodKey(currentScope)] || "");
+    setModalNoticeDate(""); // 초기화
     setNoticeModalOpen(true);
   };
 
@@ -781,6 +783,7 @@ function App() {
     alert('마스터 관리자 비밀번호가 성공적으로 변경되었습니다.');
   };
 
+  // [핵심 개선] 공지 저장 시 선택된 날짜(modalNoticeDate)가 있다면 해당 날짜의 이벤트(events)로도 자동 등록합니다!
   const handleSaveNoticeModal = async () => {
     const key = getPeriodKey(noticeScope);
     const trimmed = modalNoticeText.trim();
@@ -796,6 +799,25 @@ function App() {
     if (supabase) {
       await supabase.from('admin_status').upsert([{ week_key: `notices_${currentSchool}`, data: updated }]);
     }
+
+    // 만약 공지에 날짜가 입력되어 있다면 해당 날짜의 주간/월별 행사 일정으로도 즉시 추가합니다.
+    if (modalNoticeDate && trimmed) {
+      const noticeEvent = {
+        id: Math.floor(Date.now() + Math.random() * 1000000) % 2147483647,
+        school_name: currentSchool,
+        date: modalNoticeDate,
+        grade: selectedGrade,
+        dept: noticeScope === "grade" ? "학년 공통" : (selectedClass || "1반"),
+        content: `📢 [공지] ${trimmed}`,
+        manager: noticeScope === "grade" ? "전체" : (selectedClass || ""),
+        password: currentClassPassword
+      };
+      if (supabase) {
+        await supabase.from('events').insert([noticeEvent]);
+      }
+      setEvents(prev => [...prev, noticeEvent]);
+    }
+
     alert("공지사항이 저장되었습니다.");
   };
 
@@ -805,6 +827,7 @@ function App() {
     delete updated[key];
     setNotices(updated);
     setModalNoticeText("");
+    setModalNoticeDate("");
     setNoticeModalOpen(false);
     localStorage.setItem(`sp_notices_${currentSchool}`, JSON.stringify(updated));
     if (supabase) {
@@ -1075,8 +1098,14 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     document.body.removeChild(link);
   };
 
-  const goPrev = () => (tab === "month" ? setViewDate((d) => addMonths(d, -1)) : setWeekAnchor((d) => addDays(d, -7)));
-  const goNext = () => (tab === "month" ? setViewDate((d) => addMonths(d, 1)) : setWeekAnchor((d) => addDays(d, 7)));
+  const goPrev = () => {
+    if (tab === "month") setViewDate(prev => safeAddMonths(prev, -1));
+    else setWeekAnchor(prev => addDays(prev, -7));
+  };
+  const goNext = () => {
+    if (tab === "month") setViewDate(prev => safeAddMonths(prev, 1));
+    else setWeekAnchor(prev => addDays(prev, 7));
+  };
   const goToday = () => {
     if (tab === "month") setViewDate(new Date()); else setWeekAnchor(new Date());
   };
@@ -1695,6 +1724,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
           </Modal>
         )}
 
+        {/* [선택적 날짜 지정 기능 추가된 공지 작성 모달] */}
         {noticeModalOpen && (
           <Modal title="공지 및 협의사항 작성" onClose={() => setNoticeModalOpen(false)} wide>
             <div className="space-y-4">
@@ -1706,13 +1736,30 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                 <option value="grade">[{selectedGrade}] 학년 공통 공지</option>
                 <option value="class">[{selectedGrade} {selectedClass || '학급'}] 알림장</option>
               </select>
-              <textarea
-                value={modalNoticeText}
-                onChange={(e) => setModalNoticeText(e.target.value)}
-                rows={4}
-                className={inputCls}
-                placeholder="내용을 입력하세요."
-              />
+
+              <div>
+                <FieldLabel>공지 내용</FieldLabel>
+                <textarea
+                  value={modalNoticeText}
+                  onChange={(e) => setModalNoticeText(e.target.value)}
+                  rows={4}
+                  className={inputCls}
+                  placeholder="내용을 입력하세요."
+                />
+              </div>
+
+              {/* [선택적 날짜 입력 필드] 날짜를 지정하면 해당 날짜의 주간/월별 행사로도 자동 반영됩니다 */}
+              <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3 space-y-1.5">
+                <FieldLabel>특정 날짜 주간 행사 자동 연동 (선택 사항)</FieldLabel>
+                <p className="text-[11px] text-slate-500">날짜를 선택하고 저장하면, 해당 날짜의 일정 목록에도 이 공지가 행사처럼 표시됩니다.</p>
+                <input
+                  type="date"
+                  value={modalNoticeDate}
+                  onChange={(e) => setModalNoticeDate(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none"
+                />
+              </div>
+
               <div className="flex items-center gap-2 pt-2 border-t">
                 <button
                   type="button"
