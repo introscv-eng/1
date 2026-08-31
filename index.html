@@ -497,10 +497,9 @@ function App() {
 
   const [notices, setNotices] = useState({});
 
-  const getPeriodKey = (scopeType) => {
-    const period = tab === "month"
-      ? `${viewDate.getFullYear()}-${pad2(viewDate.getMonth() + 1)}`
-      : ymd(startOfWeekMon(weekAnchor));
+  const getPeriodKey = (scopeType, targetDateObj = null) => {
+    const baseDate = targetDateObj ? new Date(targetDateObj) : (tab === "month" ? viewDate : weekAnchor);
+    const period = `${baseDate.getFullYear()}-${pad2(baseDate.getMonth() + 1)}`;
     if (scopeType === "grade") {
       return `${currentSchool}_${selectedGrade}_COMMON_${period}`;
     } else {
@@ -991,8 +990,6 @@ function App() {
   const handlePrint = () => {
     const isMonth = tab === "month";
     const activeDays = isMonth ? monthDays : weekDates;
-    const gNotice = (notices[gradeNoticeKey] || "").trim();
-    const cNotice = (notices[classNoticeKey] || "").trim();
 
     const escapeToExcelCell = (str) => {
       if (!str) return "";
@@ -1032,42 +1029,63 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
       const hol = (customHolidays && customHolidays[dStr]) || FIXED_HOLIDAYS[dStr] || FIXED_HOLIDAYS[dStr.slice(5)] || "";
       const evList = sortEvents(eventsByDate[dStr] || []);
 
+      // [핵심 연동] 해당 날짜가 속한 월의 학년 공통공지를 엑셀 출력 테이블에도 자동으로 포함시킵니다.
+      const dObj = new Date(d);
+      const rowMonthKey = getPeriodKey("grade", dObj);
+      const rowGradeNotice = (notices[rowMonthKey] || "").trim();
+
+      let cellContentArray = [];
+      if (hol) cellContentArray.push(`[휴일] ${hol}`);
+      if (rowGradeNotice) cellContentArray.push(`[학년 공통공지]\n${rowGradeNotice}`);
+
       if (evList.length === 0) {
-        htmlTableContent += `
+        if (cellContentArray.length > 0) {
+          htmlTableContent += `
 <tr>
 <td style="text-align: center;">${dayNum}</td>
 <td style="text-align: center;">${dowStr}</td>
-<td>${hol ? escapeToExcelCell(`[휴일] ${hol}`) : ""}</td>
+<td>${escapeToExcelCell(cellContentArray.join("\n\n"))}</td>
 <td style="text-align: center;">-</td>
 </tr>`;
+        } else {
+          htmlTableContent += `
+<tr>
+<td style="text-align: center;">${dayNum}</td>
+<td style="text-align: center;">${dowStr}</td>
+<td></td>
+<td style="text-align: center;">-</td>
+</tr>`;
+        }
       } else {
-        evList.forEach(ev => {
+        evList.forEach((ev, evIdx) => {
           const badgeLabel = ev.dept || "학습";
           const isCommon = badgeLabel === "학년 공통";
           const targetStr = isCommon ? (ev.manager && ev.manager !== "전체" ? ` [${ev.manager}]` : " [전체]") : "";
           const contentText = `[${badgeLabel}]${targetStr} ${ev.content}`;
           const managerText = !isCommon && ev.manager ? ev.manager : "-";
+
+          let finalColText = contentText;
+          if (evIdx === 0 && cellContentArray.length > 0) {
+            finalColText = [...cellContentArray, contentText].join("\n\n");
+          }
+
           htmlTableContent += `
 <tr>
 <td style="text-align: center;">${dayNum}</td>
 <td style="text-align: center;">${dowStr}</td>
-<td>${escapeToExcelCell(contentText)}</td>
+<td>${escapeToExcelCell(finalColText)}</td>
 <td style="text-align: center;">${escapeToExcelCell(managerText)}</td>
 </tr>`;
         });
       }
     });
 
-    if (gNotice || cNotice) {
-      const combinedNotices = [
-        gNotice ? `[학년 공통]\n${gNotice}` : "",
-        cNotice ? `[학급/전담]\n${cNotice}` : ""
-      ].filter(Boolean).join("\n\n");
-
+    const cNotice = (notices[classNoticeKey] || "").trim();
+    if (cNotice) {
       htmlTableContent += `
 <tr>
-<td colspan="2" style="text-align: center; font-weight: bold; background-color: #f9fafb;">공지 및 협의</td>
-<td colspan="2">${escapeToExcelCell(combinedNotices)}</td>
+<td colspan="2" style="text-align: center; font-weight: bold; background-color: #f9fafb;">학급 알림장</td>
+<td colspan="2">${escapeToExcelCell(cNotice)}</td>
 </tr>`;
     }
 
@@ -1096,7 +1114,7 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
 
   const emptyForm = {
     targetGrade: selectedGrade,
-    category: "학년 공통", // 기본값을 '학년 공통'으로 설정하여 언제든 다중 선택이 가능하도록 함
+    category: "학년 공통",
     content: "",
     manager: "",
     password: "",
@@ -1115,9 +1133,6 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     const baseDate = dateStr || ymd(today);
     const defaultEnd = ymd(addMonths(new Date(baseDate), 1));
     const initialCycles = [{ date: baseDate }];
-    
-    // [개선 포인트] 사용자가 1반에 있든 공통 뷰에 있든 '일정 추가'를 누르면 
-    // 기본 카테고리를 '학년 공통'으로 열어주어 언제든 다중 반 선택 및 공통 행사를 등록할 수 있게 합니다.
     const autoCategory = "학년 공통";
     
     setForm({
@@ -1462,14 +1477,31 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
           {(tab === "month" ? monthDays : weekDates).map((d, idx) => {
             const dStr = ymd(d);
             const dayEvents = eventsByDate[dStr] || [];
-            const evIds = dayEvents.map(e => e.id);
+            
+            // [핵심 연동 구현] 해당 날짜가 속한 월의 학년 공통공지를 자동으로 불러와서 일정 목록(dayEvents) 상단에 뱃지와 함께 깔끔하게 띄워줍니다!
+            const dObj = new Date(d);
+            const rowMonthKey = getPeriodKey("grade", dObj);
+            const rowGradeNotice = (notices[rowMonthKey] || "").trim();
+
+            const combinedEventsForDay = [
+              ...(rowGradeNotice ? [{
+                id: `notice_badge_${dStr}_${rowGradeNotice}`,
+                dept: "학년 공통",
+                content: `📢 [학년 공통공지] ${rowGradeNotice}`,
+                manager: "전체"
+              }] : []),
+              ...dayEvents
+            ];
+
+            const evIds = combinedEventsForDay.map(e => e.id);
             const isDateSelected = evIds.length > 0 && evIds.every(id => selectedEventIds.has(id));
+
             return (
               <DateRow
                 key={dStr}
                 date={d}
                 today={today}
-                events={dayEvents}
+                events={combinedEventsForDay}
                 isLast={idx === (tab === "month" ? monthDays : weekDates).length - 1}
                 onAddEvent={openAddEvent}
                 onOpenEvent={openEditEvent}
@@ -2137,7 +2169,6 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                 </div>
               </div>
 
-              {/* [최종 개선] 어떤 화면(1반이든 공통이든)에 있든 카테고리를 '학년 공통'으로 바꾸면 즉시 다중 날짜 및 학급 선택 세트가 나타납니다 */}
               <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <FieldLabel>현재 등록 모드</FieldLabel>
@@ -2260,7 +2291,6 @@ th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                 )}
               </div>
 
-              {/* 학급 전용 모드일 때 단일 날짜 선택 */}
               {form.category !== "학년 공통" && (
                 <div>
                   <FieldLabel>날짜 선택</FieldLabel>
